@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="reports/figures/banner.svg" width="100%" alt="Genesys Manager V2 Banner">
+  <img src="reports/figures/banner.svg?v=2" width="100%" alt="Genesys Manager V2 Banner">
 </div>
 
 # ⚡ Genesys Manager: Gestão Avançada Genesys Cloud
