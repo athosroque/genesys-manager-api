@@ -57,4 +57,32 @@ Abaixo, os principais endpoints internos e sua correlação com a API da Genesys
 ```
 
 ---
+
+## 🚀 Como Rodar Localmente (Desenvolvimento)
+
+Para executar apenas o backend fora do Docker:
+
+1.  **Crie um ambiente virtual:**
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate  # Linux/Mac
+    # No Windows: .venv\Scripts\activate
+    ```
+
+2.  **Instale as dependências:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  **Configure o arquivo `.env`:**
+    Copie o `.env.example` e preencha as variáveis.
+
+4.  **Inicie o servidor:**
+    ```bash
+    uvicorn main:app --reload
+    ```
+    *A API estará acessível em `http://localhost:8000`.*
+
+---
+
 **Camada de Segurança:** Todas as rotas sob `/api/*` (exceto `/auth/login`) exigem um JWT válido e verificado pelo middleware de segurança local.

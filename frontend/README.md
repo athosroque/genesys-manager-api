@@ -8,7 +8,7 @@ A interface do Genesys Manager é uma Single Page Application (SPA) construída 
 
 - **Vue 3 (Composition API)**: Framework reativo com a sintaxe `<script setup>` para código limpo e modular.
 - **Vite**: Build tool de última geração que permite HMR (Hot Module Replacement) instantâneo.
-- **Tailwind CSS v4**: Framework CSS utility-first que permite a criação de interfaces customizadas com zero CSS escrito à mão.
+- **Tailwind CSS v3**: Framework CSS utility-first que permite a criação de interfaces customizadas com zero CSS escrito à mão.
 - **Vue Router**: Motor de navegação com suporte a *Navigation Guards* para proteção de rotas.
 - **Vitest**: Framework de testes unitários focado em componentes Vue.
 
@@ -56,4 +56,25 @@ O deploy do frontend é realizado em **Multi-stage Build**:
 ```
 
 ---
+
+## 🚀 Como Rodar Localmente (Desenvolvimento)
+
+Para executar o dashboard em modo de desenvolvimento:
+
+1.  **Instale as dependências:**
+    ```bash
+    npm install
+    ```
+
+2.  **Configure o arquivo `.env`:**
+    Crie um arquivo `.env` na raiz da pasta `frontend` (ou use o `.env.example` como base).
+
+3.  **Inicie o servidor de desenvolvimento:**
+    ```bash
+    npm run dev
+    ```
+    *O dashboard estará acessível em `http://localhost:5173`.*
+
+---
+
 **Design System:** O projeto utiliza uma paleta de cores harmoniosa baseada em tons de **Teal** e **Dark Slate**, otimizada para longos períodos de uso sem fadiga visual.
