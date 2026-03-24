@@ -26,19 +26,6 @@
 
 Originalmente um script manual no Google Colab, a gestão de usuários no Genesys Cloud era fragmentada e de difícil auditoria. O **Genesys Manager V2** centraliza essa operação em uma plataforma web segura, automatizando fluxos complexos de reativação e migração que antes levavam minutos em segundos.
 
-## 🏗️ Arquitetura do Sistema
-
-O sistema utiliza uma arquitetura de proxy reverso e túnel seguro para exposição global sem abertura de portas locais.
-
-```mermaid
-graph TD
-    User((Usuário)) -->|HTTPS| CF[Cloudflare Tunnel]
-    CF -->|Proxy| Nginx[NGINX Reverse Proxy]
-    Nginx -->|/ (Static)| FE[Vue 3 SPA]
-    Nginx -->|/api (Proxy)| BE[FastAPI Backend]
-    BE -->|OAuth2| GC[Genesys Cloud API]
-```
-
 ## 📊 Stack Tecnológica
 
 ### Core Services
