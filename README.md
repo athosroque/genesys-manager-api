@@ -55,4 +55,4 @@ Originalmente um script manual no Google Colab, a gestão de usuários no Genesy
 4.  **Acesso:** Disponível em `http://localhost:80`.
 
 ---
-**Desenvolvido por Athos** - [GitHub](https://github.com/athosroque)
+**Desenvolvido por Athos** - [LinkedIn](https://www.linkedin.com/in/athosroque) | [GitHub](https://github.com/athosroque)
