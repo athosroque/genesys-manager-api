@@ -1,30 +1,36 @@
 <svg width="800" height="200" viewBox="0 0 800 200" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="800" height="200" fill="#0D1117"/>
-  <!-- Decorative Grid -->
+  
+  <!-- Back Grid Pattern -->
   <path d="M0 40H800M0 80H800M0 120H800M0 160H800" stroke="#161B22" stroke-width="1"/>
   <path d="M40 0V200M80 0V200M120 0V200M160 0V200" stroke="#161B22" stroke-width="1"/>
   
-  <!-- Logo Icon -->
-  <rect x="50" y="60" width="80" height="80" rx="12" fill="#00D4AA" fill-opacity="0.1"/>
-  <path d="M75 115V85L105 100L75 115Z" fill="#00D4AA"/>
-  <rect x="70" y="80" width="40" height="40" rx="4" stroke="#00D4AA" stroke-width="3"/>
+  <!-- Genesys Cloud Stylized Icon (SVG Recreation) -->
+  <g transform="translate(60, 65) scale(1.2)">
+    <!-- Lower Bubble -->
+    <path d="M10 35C10 26.7157 16.7157 20 25 20H45C53.2843 20 60 26.7157 60 35C60 43.2843 53.2843 50 45 50H25L10 60V35Z" fill="#FF5F1F"/>
+    <!-- Upper Bubble -->
+    <path d="M30 15C30 6.71573 36.7157 0 45 0H65C73.2843 0 80 6.71573 80 15C80 23.2843 73.2843 30 65 30H45L30 40V15Z" fill="#FF5F1F" fill-opacity="0.9"/>
+    <!-- Accent Dots -->
+    <circle cx="5" cy="55" r="4" fill="#FF5F1F"/>
+    <circle cx="85" cy="15" r="4" fill="#FF5F1F"/>
+  </g>
   
   <!-- Main Title -->
-  <text x="160" y="95" fill="white" font-family="Arial, sans-serif" font-size="32" font-weight="bold">GENESYS MANAGER</text>
-  <text x="160" y="125" fill="#8B949E" font-family="Arial, sans-serif" font-size="16">V2.0 · Professional Ops Dashboard</text>
+  <text x="180" y="95" fill="white" font-family="Arial, sans-serif" font-size="32" font-weight="bold">GENESYS MANAGER</text>
+  <text x="180" y="125" fill="#8B949E" font-family="Arial, sans-serif" font-size="16">V2.0 · Professional Ops Dashboard</text>
   
   <!-- Tech Stack Line -->
-  <g transform="translate(160, 150)">
-    <!-- Python -->
+  <g transform="translate(180, 150)">
     <rect x="0" y="0" width="80" height="24" rx="4" fill="#3776AB"/>
     <text x="40" y="16" fill="white" font-family="Arial" font-size="10" text-anchor="middle">PYTHON</text>
-    <!-- FastAPI -->
+    
     <rect x="90" y="0" width="80" height="24" rx="4" fill="#05998B"/>
     <text x="130" y="16" fill="white" font-family="Arial" font-size="10" text-anchor="middle">FASTAPI</text>
-    <!-- Vue -->
+    
     <rect x="180" y="0" width="80" height="24" rx="4" fill="#42B883"/>
     <text x="220" y="16" fill="white" font-family="Arial" font-size="10" text-anchor="middle">VUE 3</text>
-    <!-- Docker -->
+    
     <rect x="270" y="0" width="80" height="24" rx="4" fill="#2496ED"/>
     <text x="310" y="16" fill="white" font-family="Arial" font-size="10" text-anchor="middle">DOCKER</text>
   </g>
