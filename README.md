@@ -19,7 +19,6 @@
 - **🚀 Frontend:** [Vue 3 App](frontend/)
 - **⚙️ Backend:** [FastAPI Core](backend/)
 - **🔐 Segurança:** [Protocolo de Autenticação](backend/auth.py)
-- **📦 Infraestrutura:** [Orquestração Docker](docker-compose.yml)
 
 ---
 
