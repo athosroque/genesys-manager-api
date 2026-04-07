@@ -19,7 +19,7 @@
 
 ### 🌐 Página de Apresentação do Projeto
 
-**[→ Ver Portfólio Completo](https://athosroque.github.io/genesys-manager-api/portfolio.html)**
+**[→ Ver Portfólio Completo](https://genesys-manager.projetoathos.com.br)**
 
 *Arquitetura · Stack técnica · Destaques de engenharia · Como rodar*
 
@@ -28,7 +28,7 @@
 ---
 
 ## 🎯 Explore o Projeto
-- **🌐 Portfólio:** [Página de apresentação completa](portfolio.html)
+- **🌐 Portfólio:** [Página de apresentação completa](https://genesys-manager.projetoathos.com.br)
 - **🚀 Frontend:** [Vue 3 App](frontend/)
 - **⚙️ Backend:** [FastAPI Core](backend/)
 - **🔐 Segurança:** [Protocolo de Autenticação](backend/auth.py)

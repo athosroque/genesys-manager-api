@@ -173,6 +173,18 @@
       transition: color 0.2s;
     }
     .nav-links a:hover { color: var(--text-primary); }
+    .nav-back {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.2s;
+      white-space: nowrap;
+    }
+    .nav-back:hover { color: var(--accent); }
 
     /* ── HERO ── */
     #hero {
@@ -798,6 +810,10 @@
   <!-- ── NAV ── -->
   <nav>
     <div class="nav-inner">
+      <a href="https://projetoathos.com.br" class="nav-back">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Portfólio
+      </a>
       <a href="#hero" class="nav-logo">
         <div class="nav-logo-icon">⚙</div>
         Genesys Manager
