@@ -27,8 +27,38 @@ O frontend utiliza o padrão de **Composables** para encapsular lógica de negó
     - Sistema de notificações globais.
     - Permite disparar avisos de `sucesso`, `erro` ou `loading` de qualquer parte da aplicação.
 
-3.  **Security (Navigation Guards)**:
+3.  **useEntityNames.js** (e o alias `useUserNames.js`):
+    - Cache global UUID → nome, compartilhado entre telas, com duas estratégias:
+      resolução **per-UUID sob demanda** (usuários, pool de concorrência + teto
+      de lookups) e **mapa bulk** (roles/grupos/divisões, busca única por
+      sessão via `ensureBulk()`), usado pra traduzir os UUIDs que aparecem na
+      timeline de auditoria em nomes legíveis sem custo repetido.
+
+4.  **Security (Navigation Guards)**:
     - Todas as rotas (exceto `/login`) são protegidas. Se o estado `isAuthenticated` for falso, o usuário é redirecionado automaticamente para a autenticação.
+
+---
+
+## 🔎 Módulo de Auditoria
+
+`AuditView.vue` (rota `/auditoria`) expõe a Platform Audit API da Genesys em
+duas abas: filtros dinâmicos por serviço/entidade/ação, e busca **"Por
+pessoa"** (o que ela fez / o que fizeram com ela), com fan-out concorrente em
+múltiplos serviços e, quando o alvo do evento não é a própria pessoa (ex.:
+membership de fila/role/grupo), uma varredura profunda no backend
+(`/audits/search/deep`) que filtra por UUID no corpo do evento.
+
+- `AuditTimeline.vue` — timeline reutilizável (usada também no perfil do
+  usuário em `ConsultaView.vue`), separa eventos `USER` de `SYSTEM` e mostra
+  diff de propriedades expandível.
+- `AuditTokens.vue` — renderiza a frase de cada evento como tokens; resolve
+  UUIDs de usuário/role/grupo/divisão para nome via os composables acima,
+  com fallback pra UUID abreviado + copiar quando não há nome.
+- `utils/auditFormat.js` — interpretação por serviço dos formatos de UUID
+  embutidos em `propertyChanges` (cada serviço da Audit API esconde o UUID
+  da pessoa afetada num lugar diferente — chave composta, string não-JSON,
+  etc.). O comportamento real de cada serviço, validado empiricamente, está
+  documentado em [`refencia retornos/DICIONARIO-AUDITORIA.md`](../refencia%20retornos/DICIONARIO-AUDITORIA.md).
 
 ---
 
@@ -46,7 +76,7 @@ O deploy do frontend é realizado em **Multi-stage Build**:
 ```text
 ├── src/
 │   ├── api/            # Abstração de chamadas HTTP (Fetch wrappers)
-│   ├── views/          # Páginas principais (Login, Consulta, Migração)
+│   ├── views/          # Páginas principais (Login, Consulta, Migração, Auditoria)
 │   ├── components/     # Componentes UI (Cards, Search, Modals)
 │   ├── composables/    # Lógica de estado reativo (Hooks)
 │   ├── router/         # Configuração de rotas e guardiões

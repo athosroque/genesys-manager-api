@@ -7,6 +7,7 @@ __pycache__/
 venv/
 env/
 .env
+.pytest_cache/
 
 # Node
 node_modules/
@@ -16,3 +17,14 @@ dist-ssr/
 .DS_Store
 docker-compose.override.yml
 backend/users.json
+
+# Claude Code — permissões/config local, não faz sentido versionar num repo público
+.claude/
+
+# Amostras reais da Audit API (PII — nunca versionar)
+refencia_retornos/amostras/
+
+# Docs de estudo já superadas pelo DICIONARIO-AUDITORIA.md — mantidas localmente
+# como histórico, mas não versionadas (conteúdo duplicado/contradito)
+refencia_retornos/REFERENCIA_RETORNOS.md
+refencia_retornos/PROMPT-NORMALIZACAO-NOMES.md

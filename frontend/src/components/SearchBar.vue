@@ -22,13 +22,13 @@
       >
       
       <div class="absolute inset-y-2 right-2 flex items-center">
-        <button 
+        <button
           type="submit"
           :disabled="!isValid || loading"
           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white transition-all shadow-sm"
           :class="[
-            !isValid || loading 
-              ? 'bg-gray-800 text-gray-500 cursor-not-allowed border-gray-700' 
+            !isValid || loading
+              ? 'bg-gray-800 text-gray-500 cursor-not-allowed border-gray-700'
               : 'bg-blue-600 hover:bg-blue-500 hover:shadow-blue-900/20 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-gray-900'
           ]"
         >
@@ -41,6 +41,22 @@
           </span>
         </button>
       </div>
+
+      <!-- Sugestões por nome/e-mail (autocomplete) — clicar já dispara a busca -->
+      <ul
+        v-if="suggestions.length"
+        class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-700 bg-gray-900 shadow-xl"
+      >
+        <li
+          v-for="u in suggestions"
+          :key="u.id"
+          class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-800 cursor-pointer"
+          @click="selectSuggestion(u)"
+        >
+          <p class="font-medium">{{ u.name }}</p>
+          <p class="text-xs text-gray-500">{{ u.email }} · {{ u.state }}</p>
+        </li>
+      </ul>
     </form>
     
     <div class="mt-3 flex items-center gap-2 text-xs text-gray-500 ml-1">
@@ -51,8 +67,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import LoadingSpinner from './LoadingSpinner.vue'
+import { autocompleteUsers } from '../api/genesys'
 
 const props = defineProps({
   loading: {
@@ -63,14 +80,53 @@ const props = defineProps({
 
 const emit = defineEmits(['search'])
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const query = ref('')
 const isFocused = ref(false)
+const suggestions = ref([])
 
 const isValid = computed(() => query.value.trim().length > 0)
 
 const handleSearch = () => {
   if (isValid.value && !props.loading) {
+    suggestions.value = []
     emit('search', query.value.trim())
   }
+}
+
+// Autocomplete por nome/e-mail — mesmo padrão de AuditView.vue (aba "Por
+// pessoa"): debounce de 300ms, ignora UUID completo (não tem o que sugerir).
+let suppressQueryWatch = false
+let debounceTimer = null
+
+watch(query, (q) => {
+  if (suppressQueryWatch) {
+    suppressQueryWatch = false
+    return
+  }
+  clearTimeout(debounceTimer)
+  const trimmed = q.trim()
+  if (props.loading || trimmed.length < 2 || UUID_RE.test(trimmed.replace(/[{}]/g, ''))) {
+    suggestions.value = []
+    return
+  }
+  debounceTimer = setTimeout(async () => {
+    try {
+      const data = await autocompleteUsers(trimmed)
+      suggestions.value = data.results || []
+    } catch {
+      suggestions.value = []
+    }
+  }, 300)
+})
+
+// Clicar numa sugestão já dispara a busca completa (auto-disparar), como se
+// o UUID/e-mail exato tivesse sido digitado e o Buscar clicado.
+function selectSuggestion(u) {
+  suggestions.value = []
+  suppressQueryWatch = true
+  query.value = ''
+  emit('search', u.id)
 }
 </script>

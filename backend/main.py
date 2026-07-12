@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from config import settings
+from config import settings, GRUPOS_MIGRACAO
 from auth import get_token
-from routes.users import router as users_router
 
 app = FastAPI(title="Genesys Manager")
 
@@ -16,17 +15,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-from routes import users, queues, groups, migration, auth_routes
+from routes import users, queues, groups, migration, auth_routes, audits, roles, divisions
 
 # Rotas de negócio
 app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(queues.router, prefix="/queues", tags=["Queues"])
 app.include_router(groups.router, prefix="/groups", tags=["Groups"])
+app.include_router(roles.router, prefix="/roles", tags=["Roles"])
+app.include_router(divisions.router, prefix="/divisions", tags=["Divisions"])
 app.include_router(migration.router, prefix="/migration", tags=["Migration"])
-
-from config import settings, GRUPOS_MIGRACAO
-# ... imports ...
+app.include_router(audits.router, prefix="/audits", tags=["Auditoria"])
 
 @app.get("/config/groups")
 async def get_groups_config():

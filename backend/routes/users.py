@@ -9,6 +9,43 @@ router = APIRouter()
 
 UUID_REGEX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 
+@router.get("/autocomplete")
+async def autocomplete_users(q: str = Query(..., min_length=2, description="Trecho do nome ou e-mail"), current_user: dict = Depends(get_current_user)):
+    """
+    Busca incremental por nome/e-mail (CONTAINS), para popular autocomplete.
+    Diferente de /search (EXACT, 1 resultado): aqui pode haver várias correspondências parciais.
+    """
+    token = await get_token()
+    headers = h(token)
+
+    payload = {
+        "query": [
+            {"fields": ["name", "email"], "value": q, "type": "CONTAINS"},
+            {"fields": ["state"], "values": ["active", "inactive"], "type": "EXACT", "operator": "OR"},
+        ],
+        "pageSize": 8,
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{BASE_URL}/users/search", json=payload, headers=headers)
+
+        if response.status_code >= 400:
+            raise HTTPException(status_code=response.status_code, detail=f"Erro na busca Genesys: {response.text}")
+
+        results = response.json().get("results", [])
+        return {
+            "results": [
+                {
+                    "id": u.get("id"),
+                    "name": u.get("name"),
+                    "email": u.get("email"),
+                    "state": u.get("state"),
+                }
+                for u in results
+            ]
+        }
+
+
 @router.get("/search")
 async def search_user(q: str = Query(..., min_length=1, description="Matricula, e-mail ou UUID"), current_user: dict = Depends(get_current_user)):
     """
@@ -169,5 +206,30 @@ async def get_user_queues(user_id: str, current_user: dict = Depends(get_current
             }
             for item in entities
         ]
-        
+
         return {"queues": queues}
+
+
+@router.get("/{user_id}/name")
+async def get_user_name(user_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Lookup leve de usuário por UUID, sem expand — devolve só {id, name}.
+    Substitui o /search pesado (que expande authorization+groups e faz N
+    chamadas extras) como fonte de nome para o cache da Trilha de Auditoria.
+    """
+    user_id = user_id.strip("{}")
+    token = await get_token()
+    headers = h(token)
+
+    async with httpx.AsyncClient() as client:
+        url = f"{BASE_URL}/users/{user_id}"
+        response = await client.get(url, headers=headers)
+
+        if response.status_code == 404:
+            return {"found": False, "id": user_id, "name": None}
+
+        if response.status_code >= 400:
+            raise HTTPException(status_code=response.status_code, detail=f"Erro ao buscar usuário Genesys: {response.text}")
+
+        data = response.json()
+        return {"found": True, "id": data.get("id", user_id), "name": data.get("name")}

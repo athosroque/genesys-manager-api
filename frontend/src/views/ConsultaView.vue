@@ -43,13 +43,23 @@
     <template v-else-if="user">
 
       <!-- Card do Usuário -->
-      <UserCard 
-        :user="user" 
-        :queues="queues" 
+      <UserCard
+        :user="user"
+        :queues="queues"
         :loading="queuesLoading"
         @remove-from-queue="onRemoveFromQueue"
         @remove-all-queues="showQueuesConfirm = true"
       />
+
+      <div class="flex justify-end -mt-4">
+        <button
+          @click="goToAudit"
+          class="text-xs font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1.5"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          Ver auditoria deste usuário
+        </button>
+      </div>
 
       <!-- Confirm: Remoção Individual de Fila -->
       <ConfirmDialog
@@ -256,6 +266,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import SearchBar from '../components/SearchBar.vue'
 import UserCard from '../components/UserCard.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
@@ -273,6 +284,11 @@ import {
 } from '../api/genesys'
 
 const { addToast } = useToast()
+const router = useRouter()
+
+function goToAudit() {
+  router.push({ path: '/auditoria', query: { userId: user.value.id, name: user.value.name } })
+}
 
 // ─── Estado de busca ───────────────────────────────────────────────────────
 const lastQuery    = ref('')

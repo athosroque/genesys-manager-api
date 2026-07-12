@@ -39,6 +39,11 @@
 
 Originalmente um script manual no Google Colab, a gestão de usuários no Genesys Cloud era fragmentada e de difícil auditoria. O **Genesys Manager V2** centraliza essa operação em uma plataforma web segura, automatizando fluxos complexos de reativação e migração que antes levavam minutos em segundos.
 
+## ✨ Funcionalidades
+
+- **Consulta e migração de usuários** — busca por matrícula/e-mail/UUID, reativação de contas e migração completa (divisão + role + grupo) em um fluxo só.
+- **Auditoria "por pessoa"** — reconstrói o histórico de um usuário na Genesys Cloud (o que ele fez / o que fizeram com ele) cruzando múltiplos serviços da Platform Audit API, incluindo eventos onde o alvo direto não é a pessoa (fila, role, grupo) via varredura profunda no backend.
+
 ## 📊 Stack Tecnológica
 
 ### Core Services
