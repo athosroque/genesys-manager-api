@@ -975,7 +975,7 @@
         <div class="solution-card reveal reveal-delay-3">
           <span class="solution-icon">🛡️</span>
           <h3>Segurança End-to-End</h3>
-          <p>Autenticação dupla: JWT local com bcrypt + OAuth 2.0 Client Credentials para a API do Genesys Cloud.</p>
+          <p>Autenticação dupla: magic link passwordless (Resend + JWT em cookie HttpOnly) + OAuth 2.0 Client Credentials para a API do Genesys Cloud.</p>
         </div>
       </div>
 
@@ -1187,14 +1187,15 @@
           <div class="highlight-card-header">
             <div class="highlight-number">03</div>
             <div>
-              <h3>Autenticação Dupla: OAuth 2.0 + JWT Local</h3>
-              <span class="highlight-sub">Segurança · auth_local.py</span>
+              <h3>Autenticação Dupla: Magic Link + OAuth 2.0</h3>
+              <span class="highlight-sub">Segurança · auth_local.py · Resend</span>
             </div>
           </div>
           <p>
-            Arquitetura de segurança em duas camadas: JWT local com <span class="code-chip">bcrypt</span>
-            para sessões de usuário (8h, HTTP-only cookie) e OAuth 2.0 Client Credentials para o Genesys Cloud.
-            CORS configurado por whitelist e cookies inacessíveis via JavaScript.
+            Login passwordless por magic link (<span class="code-chip">@claro.com.br</span>, Resend,
+            link de 10&nbsp;min) e sessão JWT em cookie HttpOnly com idle de 48h (sliding).
+            Credenciais Genesys ficam só no backend via OAuth 2.0 Client Credentials.
+            CORS por whitelist; cookies inacessíveis via JavaScript.
           </p>
         </div>
 

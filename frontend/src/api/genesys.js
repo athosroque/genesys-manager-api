@@ -37,8 +37,10 @@ export const getGroupsConfig = () => request('/config/groups')
 // nomes da Trilha de Auditoria.
 export const getUserName = (id) => request(`/users/${id}/name`)
 
-// Mapas {id, name} completos de roles, grupos e divisões da org — resolvem os
-// chips da auditoria de uma vez (ver useEntityNames.js).
+// Mapas {id, name} completos de roles, grupos, filas e divisões da org —
+// resolvem os chips da auditoria e alimentam a busca por nome (ver
+// useEntityNames.js).
 export const listRoles = () => request('/roles')
 export const listGroups = () => request('/groups')
+export const listQueues = () => request('/queues')
 export const listDivisions = () => request('/divisions')

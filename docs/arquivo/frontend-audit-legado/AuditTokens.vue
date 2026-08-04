@@ -45,7 +45,7 @@
 
 <script setup>
 import { onMounted, ref, watch } from 'vue'
-import { shortUuid, copyText } from '../utils/auditFormat'
+import { shortUuid, copyText } from './auditFormat'
 import { useUserNames } from '../composables/useUserNames'
 import { useRoleNames, useGroupNames, useDivisionNames } from '../composables/useEntityNames'
 

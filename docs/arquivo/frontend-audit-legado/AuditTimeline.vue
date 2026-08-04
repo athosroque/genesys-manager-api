@@ -208,7 +208,7 @@ import {
   describeEvent,
   formatChanges,
   shortUuid,
-} from '../utils/auditFormat'
+} from './auditFormat'
 
 const props = defineProps({
   entities: { type: Array, default: () => [] },

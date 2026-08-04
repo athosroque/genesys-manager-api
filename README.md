@@ -31,7 +31,7 @@
 - **🌐 Portfólio:** [Página de apresentação completa](https://genesys-manager.projetoathos.com.br)
 - **🚀 Frontend:** [Vue 3 App](frontend/)
 - **⚙️ Backend:** [FastAPI Core](backend/)
-- **🔐 Segurança:** [Protocolo de Autenticação](backend/auth.py)
+- **🔐 Auth local:** [Magic link + JWT](backend/auth_local.py) · [Rotas](backend/routes/auth_routes.py)
 
 ---
 
@@ -41,8 +41,24 @@ Originalmente um script manual no Google Colab, a gestão de usuários no Genesy
 
 ## ✨ Funcionalidades
 
+- **Login passwordless** — magic link por e-mail `@claro.com.br` (Resend); sessão JWT em cookie HttpOnly com idle de 48h (sliding).
+- **Admin de usuários locais** — listar, cadastrar e excluir operadores da plataforma (`GET/POST/DELETE /auth/users*`); domínio sozinho não basta — o e-mail precisa existir em `users.json`.
 - **Consulta e migração de usuários** — busca por matrícula/e-mail/UUID, reativação de contas e migração completa (divisão + role + grupo) em um fluxo só.
-- **Auditoria "por pessoa"** — reconstrói o histórico de um usuário na Genesys Cloud (o que ele fez / o que fizeram com ele) cruzando múltiplos serviços da Platform Audit API, incluindo eventos onde o alvo direto não é a pessoa (fila, role, grupo) via varredura profunda no backend.
+- **Trilha de Auditoria** — alterações de uma pessoa no período: **Pesquisar** traz só divisão; botões separados buscam filas, roles ou grupos (merge na lista), via `POST /audits/user-changes` (`deep_categories`) e cards normalizados no frontend.
+
+## 🔐 Autenticação (resumo)
+
+| Item | Comportamento |
+| :--- | :--- |
+| Login | Passwordless: `POST /auth/login` com e-mail → magic link |
+| Domínio | Somente `@{ALLOWED_EMAIL_DOMAIN}` (padrão: `claro.com.br`) |
+| Cadastro | Usuário **precisa** estar em `users.json` (admin cria ou edição manual). Ter o domínio não basta. |
+| Link | Uso único, hash SHA-256 em `auth_tokens.json`, TTL **10 min** (`MAGIC_LINK_EXPIRE_MINUTES`) |
+| Sessão | Cookie `access_token` HttpOnly; idle **48h** (`JWT_EXPIRE_MINUTES=2880`), renovado a cada request autenticado |
+| E-mail | Resend (`RESEND_*`); FROM em domínio verificado (ex.: `noreply@projetoathos.com.br`) |
+| Admin | Rotas `/auth/users*` exigem `role: admin` |
+
+Detalhes e riscos residuais: [backend/README.md](backend/README.md#segurança).
 
 ## 📊 Stack Tecnológica
 
@@ -56,13 +72,25 @@ Originalmente um script manual no Google Colab, a gestão de usuários no Genesy
 
 ## 📁 Estrutura do Projeto
 
+| Pasta / arquivo | Para que serve |
+| :--- | :--- |
+| `backend/` | API FastAPI: auth magic link, proxy Genesys, auditoria, migração |
+| `frontend/` | SPA Vue 3 (login, consulta/migração, trilha de auditoria, admin) |
+| `refencia_retornos/` | Material de referência da Audit API (dicionário, âncora, amostras locais) |
+| `docs/arquivo/` | Código/UI histórica fora do runtime (ex.: CLI de senha, UI antiga de auditoria) |
+| `reports/figures/` | Banner e assets visuais do README / portfólio |
+| `portfolio.html` | Página estática de apresentação do projeto |
+| `docker-compose.yml` | Stack local: backend + frontend (nginx na porta **8082**) |
+| `.gitignore` | Ignora `.env`, `users.json`, `auth_tokens.json`, amostras com PII, etc. |
+
 ```text
-├── backend/            # API Python (FastAPI, Auth, Routes)
-├── frontend/           # Interface Vue 3 (Vite, Tailwind)
-├── reports/            # Ativos visuais e documentação técnica
-│   └── figures/        # Banners e diagramas
-├── docker-compose.yml  # Orquestração de containers
-└── .gitignore          # Proteção de envs e caches
+├── backend/                 # Runtime da API
+├── frontend/                # Runtime da SPA
+├── refencia_retornos/       # Referência Audit API (não é serviço)
+├── docs/arquivo/            # Histórico / legado (não entra no Docker)
+├── reports/figures/         # Assets visuais
+├── portfolio.html           # Landing de portfólio
+└── docker-compose.yml
 ```
 
 ## 🛠️ Pré-requisitos
@@ -90,9 +118,10 @@ Esta é a forma mais rápida de subir o ambiente completo.
     ```
 
 2.  **Configure as variáveis de ambiente:**
-    Copie o arquivo de exemplo e preencha com suas credenciais:
     ```bash
     cp backend/.env.example backend/.env
+    # Preencha Genesys OAuth, JWT_SECRET_KEY, RESEND_* e APP_BASE_URL
+    # (nunca commite o .env — está no .gitignore)
     ```
     *Nota: Consulte a seção de [Variáveis de Ambiente](#-variáveis-de-ambiente) abaixo.*
 
@@ -102,8 +131,10 @@ Esta é a forma mais rápida de subir o ambiente completo.
     ```
 
 4.  **Acesse a aplicação:**
-    - **Frontend:** [http://localhost:80](http://localhost:80)
-    - **API Docs (Swagger):** [http://localhost:8000/docs](http://localhost:8000/docs)
+    - **Frontend (Compose):** [http://localhost:8082](http://localhost:8082)
+    - **API Docs:** via proxy `/api/docs` ou backend exposto conforme o Compose
+
+5.  **Primeiro usuário admin:** crie/edite `backend/users.json` (não versionado) com um usuário `role: admin` e e-mail `@claro.com.br`, ou use o módulo Admin após ter um admin inicial.
 
 ### 💻 2. Desenvolvimento Local
 
@@ -130,15 +161,25 @@ npm run dev
 
 ## 🔑 Variáveis de Ambiente
 
-O sistema utiliza as seguintes variáveis no arquivo `backend/.env`:
+Arquivo `backend/.env` (copie de `backend/.env.example`). **Não** coloque secrets no frontend — só `VITE_API_BASE_URL`.
 
-| Variável | Descrição | Exemplo |
+| Variável | Descrição | Exemplo / placeholder |
 | :--- | :--- | :--- |
-| `GENESYS_CLIENT_ID` | Client ID de uma integração OAuth | `ae12...` |
-| `GENESYS_CLIENT_SECRET` | Secret da integração OAuth | `xP92...` |
-| `GENESYS_REGION` | Região da sua Org Genesys | `sae1.pure.cloud` |
-| `JWT_SECRET_KEY` | Chave para assinatura de tokens locais | `openssl rand -hex 32` |
-| `ENVIRONMENT` | Ambiente de execução | `development` / `production` |
+| `GENESYS_CLIENT_ID` | Client ID OAuth (Client Credentials) | `seu_client_id_aqui` |
+| `GENESYS_CLIENT_SECRET` | Secret OAuth | `seu_client_secret_aqui` |
+| `GENESYS_REGION` | Região da org Genesys | `sae1.pure.cloud` |
+| `JWT_SECRET_KEY` | Assinatura dos JWTs locais | `openssl rand -hex 32` |
+| `JWT_EXPIRE_MINUTES` | Idle da sessão (sliding) | `2880` (48h) |
+| `ENVIRONMENT` | Flags de cookie (Secure / SameSite) | `development` / `production` |
+| `COOKIE_DOMAIN` | Domain do cookie (prod); vazio no Compose local | `.projetoathos.com.br` ou vazio |
+| `CORS_ORIGINS` | Origens permitidas (dev) | `http://localhost:5173,...` |
+| `RESEND_API_KEY` | API key Resend (só backend) | `re_xxxxxxxxx` |
+| `RESEND_FROM_EMAIL` | Remetente em domínio verificado | `Genesys Manager <noreply@projetoathos.com.br>` |
+| `APP_BASE_URL` | Base pública (link do e-mail + redirect) | `https://genesys.projetoathos.com.br` — definida só no `.env` (o Compose **não** sobrescreve). Para testar magic links só em localhost, altere temporariamente no `backend/.env`; não bakeie localhost no `docker-compose.yml` se a stack também servir o domínio público. |
+| `ALLOWED_EMAIL_DOMAIN` | Domínio aceito no login/cadastro | `claro.com.br` |
+| `MAGIC_LINK_EXPIRE_MINUTES` | TTL do magic link | `10` |
+
+Arquivos sensíveis **gitignored**: `.env`, `backend/users.json`, `backend/auth_tokens.json`.
 
 ---
 **Desenvolvido por Athos** - [LinkedIn](https://www.linkedin.com/in/athosroque) | [GitHub](https://github.com/athosroque)

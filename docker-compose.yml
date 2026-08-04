@@ -6,6 +6,14 @@ services:
       context: ./backend
     env_file: 
       - ./backend/.env
+    # Override só o necessário para cookies/CORS em stack local (HTTP :8082).
+    # APP_BASE_URL NÃO é sobrescrito aqui: vem do backend/.env (produção:
+    # https://genesys.projetoathos.com.br). Esta stack também serve o domínio
+    # público — magic links precisam da URL pública, não de localhost.
+    environment:
+      ENVIRONMENT: development
+      COOKIE_DOMAIN: ""
+      CORS_ORIGINS: "http://localhost:8082,http://localhost:5173,https://genesys.projetoathos.com.br"
     restart: unless-stopped
     expose:
       - "8000"

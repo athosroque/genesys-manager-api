@@ -40,7 +40,7 @@ router = APIRouter()
 # paralelo) + varredura de múltiplas páginas por serviço — sob carga, a
 # Genesys devolve 429 com o tempo de espera sugerido. Retentamos automático
 # em vez de propagar o erro pro usuário, já que é um limite transitório.
-MAX_RETRIES = 3
+MAX_RETRIES = 5
 DEFAULT_RETRY_SECONDS = 2.0
 
 
@@ -384,6 +384,59 @@ async def deep_search_audits(
         "scanned": scanned,
         "truncated": truncated,
     }
+
+
+class UserChangesRequest(BaseModel):
+    user: str = Field(..., min_length=1, description="E-mail ou UUID do usuário")
+    interval_start: str = Field(..., description="ISO 8601, ex: 2026-07-01T00:00:00Z")
+    interval_end: str = Field(..., description="ISO 8601, ex: 2026-08-03T23:59:59Z")
+    deep_categories: list[str] = Field(
+        default_factory=list,
+        description=(
+            'Categorias de busca profunda: "queue" | "role" | "group". '
+            "Default [] = só Directory/User (divisão). "
+            "Com categorias, roda deep só nelas (sem Directory)."
+        ),
+    )
+    deep_search: bool = Field(
+        False,
+        description=(
+            "Compat: se true e deep_categories vazio/ausente, equivale a "
+            '["queue","role","group"] + Directory. Preferir deep_categories.'
+        ),
+    )
+
+
+@router.post("/user-changes")
+async def user_changes(
+    body: UserChangesRequest, current_user: dict = Depends(get_current_user)
+) -> dict:
+    """
+    Consolida alterações relevantes de um usuário no intervalo (máx. 30 dias).
+
+    Sem deep_categories: só Directory/User (divisão).
+    Com deep_categories: deep só nas categorias pedidas.
+    Compat deep_search=true: Directory + queue/role/group.
+    """
+    from services.user_audit import get_user_changes
+
+    # Compat: deep_search=true sem categorias → None (resolve usa as 3 + Directory).
+    # Lista explícita (mesmo com deep_search) tem precedência e não inclui Directory.
+    categories_arg: Optional[list[str]]
+    if body.deep_categories:
+        categories_arg = body.deep_categories
+    elif body.deep_search:
+        categories_arg = None
+    else:
+        categories_arg = []
+
+    return await get_user_changes(
+        body.user,
+        body.interval_start,
+        body.interval_end,
+        deep_search=body.deep_search,
+        deep_categories=categories_arg,
+    )
 
 
 @router.get("/search/{transaction_id}/results")

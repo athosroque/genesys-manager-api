@@ -18,3 +18,15 @@ export const deepSearchAudits = (body) =>
         method: 'POST',
         body: JSON.stringify(body)
     })
+
+/**
+ * Alterações focadas em um usuário no intervalo.
+ * Body: { user, interval_start, interval_end, deep_categories?: string[], deep_search?: bool }
+ * deep_categories: 'queue' | 'role' | 'group' (default []). Compat: deep_search true = as 3.
+ */
+export const getUserChanges = (body, options = {}) =>
+    request('/audits/user-changes', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        ...options,
+    })

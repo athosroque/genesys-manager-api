@@ -10,14 +10,28 @@ class Settings(BaseSettings):
     GENESYS_REGION: str = os.getenv("GENESYS_REGION", "sae1.pure.cloud")
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
     
-    # Autenticação JWT
+    # Autenticação JWT (idle timeout padrão: 48h)
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
-    JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", 480))
+    JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", 2880))
     
     # Ambiente e Cookies
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "")
+
+    # Magic link (Resend) — from sandbox até domínio verificado
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+    RESEND_FROM_EMAIL: str = os.getenv(
+        "RESEND_FROM_EMAIL", "Genesys Manager <onboarding@resend.dev>"
+    )
+    APP_BASE_URL: str = os.getenv("APP_BASE_URL", "http://localhost:5173")
+    ALLOWED_EMAIL_DOMAIN: str = os.getenv("ALLOWED_EMAIL_DOMAIN", "claro.com.br")
+    MAGIC_LINK_EXPIRE_MINUTES: int = int(os.getenv("MAGIC_LINK_EXPIRE_MINUTES", 10))
+
+    @property
+    def cookie_max_age(self) -> int:
+        """Idade máxima do cookie em segundos (espelha JWT_EXPIRE_MINUTES)."""
+        return self.JWT_EXPIRE_MINUTES * 60
 
 settings = Settings()
 

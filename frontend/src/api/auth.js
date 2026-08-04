@@ -25,12 +25,32 @@ async function request(endpoint, options = {}) {
     return response.json()
 }
 
-export const login = (username, password) =>
+/** Solicita magic link por e-mail. Não estabelece sessão — isso ocorre no clique do link. */
+export const requestLoginLink = (email) =>
     request('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ email })
     })
 
 export const logout = () => request('/auth/logout', { method: 'POST' })
 
 export const getMe = () => request('/auth/me')
+
+// Gestão de usuários locais — somente admin (backend valida via role)
+export const listLocalUsers = () => request('/auth/users')
+
+export const createLocalUser = ({ email, full_name, role = 'user', username }) =>
+    request('/auth/users', {
+        method: 'POST',
+        body: JSON.stringify({
+            email,
+            full_name,
+            role,
+            ...(username ? { username } : {}),
+        }),
+    })
+
+export const deleteLocalUser = (username) =>
+    request(`/auth/users/${encodeURIComponent(username)}`, {
+        method: 'DELETE',
+    })

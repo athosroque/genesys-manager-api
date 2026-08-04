@@ -108,3 +108,22 @@ async def test_deep_search_forwards_custom_page_size():
                 assert results_kwargs["params"]["pageSize"] == 250
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_user_changes_rejects_interval_over_30_days():
+    app.dependency_overrides[get_current_user] = _fake_user
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/audits/user-changes",
+            json={
+                "user": "alguem@example.com",
+                "interval_start": "2026-07-01T00:00:00Z",
+                "interval_end": "2026-08-05T00:00:00Z",
+            },
+        )
+        assert response.status_code == 422
+        detail = response.json().get("detail", "")
+        assert "30" in str(detail)
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

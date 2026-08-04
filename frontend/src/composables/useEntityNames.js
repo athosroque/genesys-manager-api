@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { getUserName, listRoles, listGroups, listDivisions } from '../api/genesys'
+import { getUserName, listRoles, listGroups, listQueues, listDivisions } from '../api/genesys'
 
 // Caches globais UUID → nome, compartilhados entre telas (module scope): o
 // mesmo UUID nunca é buscado duas vezes na sessão. Dois modos:
@@ -60,6 +60,7 @@ function createPerUuidCache(fetcher, { maxConcurrent = 3, maxLookups = 60 } = {}
 
 function createBulkCache(loader) {
   const names = reactive(new Map())
+  const items = reactive([])
   let loaded = false
   let inFlight = null
 
@@ -69,9 +70,12 @@ function createBulkCache(loader) {
   function ensureBulk() {
     if (loaded || inFlight) return inFlight || Promise.resolve()
     inFlight = loader()
-      .then((items) => {
-        for (const it of items || []) {
-          if (it?.id && it?.name) names.set(it.id, it.name)
+      .then((list) => {
+        for (const it of list || []) {
+          if (it?.id && it?.name) {
+            names.set(it.id, it.name)
+            items.push(it)
+          }
         }
       })
       .catch(() => {})
@@ -82,15 +86,33 @@ function createBulkCache(loader) {
     return inFlight
   }
 
+  // Busca por nome (CONTAINS, case-insensitive) sobre o mapa já carregado —
+  // alimenta autocomplete de grupo/fila/role sem chamada de rede por tecla
+  // (ver "Alvo da investigação" em AuditView.vue). Chame ensureBulk() antes.
+  function search(q, limit = 8) {
+    const needle = q.trim().toLowerCase()
+    if (!needle) return []
+    const out = []
+    for (const it of items) {
+      if (it.name?.toLowerCase().includes(needle)) {
+        out.push(it)
+        if (out.length >= limit) break
+      }
+    }
+    return out
+  }
+
   return {
     ensureBulk,
     nameOf: (id) => names.get(id) || null,
+    search,
   }
 }
 
 const userCache = createPerUuidCache(getUserName, { maxConcurrent: 3, maxLookups: 60 })
 const roleCache = createBulkCache(async () => (await listRoles()).roles)
 const groupCache = createBulkCache(async () => (await listGroups()).groups)
+const queueCache = createBulkCache(async () => (await listQueues()).queues)
 const divisionCache = createBulkCache(async () => (await listDivisions()).divisions)
 
 export function useUserNames() {
@@ -103,6 +125,10 @@ export function useRoleNames() {
 
 export function useGroupNames() {
   return groupCache
+}
+
+export function useQueueNames() {
+  return queueCache
 }
 
 export function useDivisionNames() {

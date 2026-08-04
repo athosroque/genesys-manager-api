@@ -15,6 +15,12 @@ const routes = [
         path: '/auditoria',
         name: 'Auditoria',
         component: () => import('../views/AuditView.vue')
+    },
+    {
+        path: '/admin/usuarios',
+        name: 'AdminUsuarios',
+        component: () => import('../views/AdminUsersView.vue'),
+        meta: { requiresAdmin: true }
     }
 ]
 
@@ -40,6 +46,11 @@ router.beforeEach(async (to) => {
 
     // Se já estiver logado e for pro login, vai pra home
     if (isAuthenticated.value && to.name === 'Login') {
+        return { name: 'Home' }
+    }
+
+    // Rotas admin: bloqueia quem não tem role 'admin'
+    if (to.meta.requiresAdmin && user.value?.role !== 'admin') {
         return { name: 'Home' }
     }
 })

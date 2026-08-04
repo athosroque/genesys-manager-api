@@ -1,3 +1,10 @@
+"""
+ARQUIVO HISTÓRICO — não faz parte do fluxo atual.
+
+O login é passwordless (magic link). Para cadastrar operadores use a UI
+Admin (/admin/usuarios) ou POST /auth/users. Não edite hashed_password
+manualmente para “senha de login” — essa senha não é usada.
+"""
 from passlib.context import CryptContext
 import sys
 
@@ -17,4 +24,5 @@ if __name__ == "__main__":
     print("-----------------------------------")
     print(hash_password(password))
     print("-----------------------------------")
-    print("Copie este valor e insira no campo 'hashed_password' de users.json")
+    print("(Legado) Copie este valor para 'hashed_password' em users.json —")
+    print("não habilita login por senha; o produto usa magic link.")

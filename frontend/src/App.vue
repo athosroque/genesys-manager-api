@@ -43,6 +43,20 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
           Trilha de Auditoria
         </RouterLink>
+
+        <RouterLink
+          v-if="user?.role === 'admin'"
+          to="/admin/usuarios"
+          class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors"
+          :class="[
+            $route.path === '/admin/usuarios'
+              ? 'bg-blue-600/10 text-blue-400'
+              : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+          ]"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+          Usuários da Ferramenta
+        </RouterLink>
       </nav>
 
       <!-- Perfil e Logout -->
@@ -72,7 +86,11 @@
     <!-- Área Principal -->
     <main class="flex-1 relative overflow-hidden flex flex-col">
       <div class="h-full overflow-y-auto p-4 md:p-8">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <KeepAlive :include="['ConsultaView', 'AuditView']">
+            <component :is="Component" />
+          </KeepAlive>
+        </RouterView>
       </div>
     </main>
 

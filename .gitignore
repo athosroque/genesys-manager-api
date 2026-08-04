@@ -17,9 +17,13 @@ dist-ssr/
 .DS_Store
 docker-compose.override.yml
 backend/users.json
+backend/auth_tokens.json
 
 # Claude Code — permissões/config local, não faz sentido versionar num repo público
 .claude/
+
+# Cursor — planos/config local do editor
+.cursor/
 
 # Amostras reais da Audit API (PII — nunca versionar)
 refencia_retornos/amostras/

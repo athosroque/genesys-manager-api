@@ -1,10 +1,12 @@
 import json
 import os
+import secrets
+import string
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import HTTPException, status, Request
+from fastapi import HTTPException, status, Request, Response, Depends
 from config import settings
 
 # ─── Configuração de Criptografia ───────────────────────────────────────────
@@ -24,35 +26,64 @@ def load_users() -> List[dict]:
     except (json.JSONDecodeError, IOError):
         return []
 
-# ─── Utilitários de Senha ──────────────────────────────────────────────────
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifica se a senha plana coincide com o hash bcrypt."""
-    if not hashed_password:
-        return False
-    return pwd_context.verify(plain_password, hashed_password)
+def save_users(users: List[dict]) -> None:
+    """Persiste a lista de usuários de volta em users.json."""
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump({"users": users}, f, ensure_ascii=False, indent=2)
 
-# ─── Lógica de Autenticação ───────────────────────────────────────────────
-def authenticate_user(username: str, password: str) -> Optional[dict]:
+# ─── Schema users.json (hashed_password) ───────────────────────────────────
+# Login é passwordless (magic link). hash_password/generate_password só
+# preenchem o campo legado hashed_password no create admin — não há fluxo de senha.
+
+def hash_password(plain_password: str) -> str:
+    """Gera hash bcrypt (campo hashed_password do schema JSON)."""
+    return pwd_context.hash(plain_password)
+
+def generate_password(length: int = 14) -> str:
+    """Gera string aleatória forte para popular hashed_password no cadastro."""
+    symbols = "!@#$%*_-+="
+    alphabet = string.ascii_letters + string.digits + symbols
+    while True:
+        pwd = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (
+            any(c.islower() for c in pwd)
+            and any(c.isupper() for c in pwd)
+            and any(c.isdigit() for c in pwd)
+            and any(c in symbols for c in pwd)
+        ):
+            return pwd
+
+# ─── Domínio e busca por e-mail ────────────────────────────────────────────
+def is_allowed_email_domain(email: str) -> bool:
+    """Retorna True se o e-mail pertence ao domínio permitido (ex.: claro.com.br)."""
+    if not email or "@" not in email:
+        return False
+    domain = email.rsplit("@", 1)[-1].strip().lower()
+    return domain == settings.ALLOWED_EMAIL_DOMAIN.lower()
+
+
+def find_user_by_email(email: str) -> Optional[dict]:
     """
-    Autentica o usuário baseado no arquivo JSON.
-    Retorna o dicionário do usuário (sem o hash) ou None.
+    Localiza usuário ativo pelo e-mail (case-insensitive).
+    Retorna cópia sem hashed_password, ou None.
     """
+    if not email:
+        return None
+    needle = email.strip().lower()
     users = load_users()
-    user = next((u for u in users if u["username"] == username), None)
-    
+    user = next(
+        (
+            u for u in users
+            if (u.get("email") or "").strip().lower() == needle and u.get("active", False)
+        ),
+        None,
+    )
     if not user:
         return None
-    
-    if not user.get("active", False):
-        return None
-        
-    if not verify_password(password, user.get("hashed_password", "")):
-        return None
-        
-    # Retorna cópia sem a senha
     user_data = user.copy()
     user_data.pop("hashed_password", None)
     return user_data
+
 
 # ─── Gestão de Tokens JWT ─────────────────────────────────────────────────
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -73,10 +104,62 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     )
     return encoded_jwt
 
+
+def set_session_cookie(response: Response, access_token: str) -> None:
+    """Define o cookie HttpOnly da sessão (prod vs. dev)."""
+    max_age = settings.cookie_max_age
+    if settings.ENVIRONMENT == "production":
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=True,
+            samesite="none",
+            max_age=max_age,
+            path="/",
+            domain=settings.COOKIE_DOMAIN or None,
+        )
+    else:
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            samesite="lax",
+            max_age=max_age,
+            path="/",
+            secure=False,
+        )
+
+
+def clear_session_cookie(response: Response) -> None:
+    """
+    Remove o cookie de sessão com os mesmos atributos de set_session_cookie.
+    Sem domain/secure/samesite alinhados, o browser pode ignorar o delete em produção.
+    """
+    if settings.ENVIRONMENT == "production":
+        response.delete_cookie(
+            key="access_token",
+            path="/",
+            domain=settings.COOKIE_DOMAIN or None,
+            secure=True,
+            httponly=True,
+            samesite="none",
+        )
+    else:
+        response.delete_cookie(
+            key="access_token",
+            path="/",
+            secure=False,
+            httponly=True,
+            samesite="lax",
+        )
+
+
 # ─── Injeção de Dependência (FastAPI) ──────────────────────────────────────
-async def get_current_user(request: Request) -> dict:
+async def get_current_user(request: Request, response: Response) -> dict:
     """
     Dependency para extrair o usuário logado a partir do cookie 'access_token'.
+    Em caso de sucesso, renova o JWT e o cookie (sliding session de 48h).
     Lança 401 Unauthorized se o token for inválido, ausente ou expirado.
     """
     token = request.cookies.get("access_token")
@@ -111,7 +194,21 @@ async def get_current_user(request: Request) -> dict:
         
     user_data = user.copy()
     user_data.pop("hashed_password", None)
+
+    # Sliding session: reemite JWT e reseta o cookie por mais JWT_EXPIRE_MINUTES
+    renewed = create_access_token(data={"sub": username})
+    set_session_cookie(response, renewed)
+
     return user_data
+
+async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    """Dependency que restringe a rota a usuários com role 'admin'."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a administradores.",
+        )
+    return current_user
 
 def get_token_from_cookie(request: Request) -> str:
     """Extrai apenas a string do token do cookie seguro."""

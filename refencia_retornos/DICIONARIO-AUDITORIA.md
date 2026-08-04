@@ -1,5 +1,9 @@
 # Dicionário de Dados — Platform Audit API (Genesys Cloud)
 
+> **Âncora de melhorias/testes:** gaps doc↔módulo, backlog P0–P2 e fixtures oficiais
+> estão em [`ANCORA-AUDIT-DOC-VS-MODULO.md`](./ANCORA-AUDIT-DOC-VS-MODULO.md)
+> (análise 2026-08-03 das 6 páginas oficiais de Audit).
+
 Cruzamento entre a **documentação oficial** da Platform Audit API (Swagger público
 `api.mypurecloud.com/api/v2/docs/swagger`, definições `AuditQuery*` e
 `AuditLogMessage`) e o **comportamento real observado na org** (`sae1.pure.cloud`),
@@ -374,13 +378,14 @@ na memória do projeto).
   um a partir do `eventDate` mín/máx da própria página, ±5min de folga).
   Os eventos extras buscados aqui **não** entram na resposta — são só canal
   lateral pra correlação.
-- Frontend (`frontend/src/utils/auditFormat.js`) lê `ev._groupMembershipDirection`
-  pra escolher o verbo ("adicionou"/"removeu"); se a correlação falhar (grupo
-  não encontrado, consulta extra deu erro), cai numa frase neutra
-  ("alterou a associação de X com o grupo Y") em vez de chutar — nunca inferir
-  direção pelo lado old/new do `group-membership`, que é sempre a mesma forma
-  nos dois casos. `individuals` é filtrado do diff inteiramente (zero
-  informação, ver acima).
+- Frontend legado (`docs/arquivo/frontend-audit-legado/auditFormat.js`) lia
+  `ev._groupMembershipDirection` pra escolher o verbo ("adicionou"/"removeu");
+  se a correlação falhar (grupo não encontrado, consulta extra deu erro),
+  caía numa frase neutra ("alterou a associação de X com o grupo Y") em vez
+  de chutar — nunca inferir direção pelo lado old/new do `group-membership`,
+  que é sempre a mesma forma nos dois casos. `individuals` é filtrado do diff
+  inteiramente (zero informação, ver acima). A Trilha atual normaliza isso no
+  backend (`ChangeCard`) e renderiza em `UserChangesList.vue`.
 
 ### 4.5 Resumo: onde encontrar a pessoa em cada serviço
 
@@ -477,35 +482,23 @@ com `prefix="/audits"`, protegido por `Depends(get_current_user)` (mesmo
 JWT/cookie do resto do painel). Reaproveita `get_token()`/`h()` de `auth.py`
 e `BASE_URL` de `config.py`.
 
-**Frontend** — `frontend/src/api/audits.js` (client HTTP), `frontend/src/views/AuditView.vue`
-(tela com duas abas: filtros dinâmicos e busca "Por pessoa"),
-`frontend/src/components/AuditTimeline.vue` (timeline reutilizável, badge
-"via API" quando `client.id` preenchido). Rota `/auditoria` no router,
-item na sidebar (`App.vue`), botão "Ver auditoria deste usuário" na
-`ConsultaView.vue`.
+**Frontend (fluxo atual)** — `frontend/src/api/audits.js` (`getUserChanges`),
+`frontend/src/views/AuditView.vue` (Trilha: pessoa + período + divisão/deep
+por categoria), `AuditSearchBar.vue`, `UserChangesList.vue`. Rota `/auditoria`.
 
-Camada de apresentação (refactor de UX/UI, sem mudança de backend):
+**Frontend (legado, arquivado)** — UI antiga com abas/timeline ficou em
+`docs/arquivo/frontend-audit-legado/` (não entra no runtime):
 
-- `frontend/src/utils/auditFormat.js` — o §4 deste dicionário em código:
-  parsing de `QueueMember/<fila>:<user>[:joined]`, da chave composta
-  `{user}--{role}--{org}` de Role, tradução das sentinelas literais,
-  `JSON.parse` dos valores de diff e frase legível por evento.
-- `frontend/src/composables/useUserNames.js` — hoje é um re-export fino de
-  `useEntityNames.js` (ver "Resolução de nomes" abaixo). Mantém o contrato
-  antigo (`prime`/`resolveMany`/`nameOf`); a fonte de nome mudou de
-  `GET /users/search` (pesado) para `GET /users/{id}/name` (leve).
-- `frontend/src/components/AuditTokens.vue` — renderiza a frase como tokens;
-  chips de role/grupo resolvem para nome automaticamente (mapa bulk); UUID
-  fora do mapa aparece abreviado (`43e34005…8269`) com tooltip + botão copiar.
-- Timeline separa `USER` de `SYSTEM` (avatar de engrenagem, card esmaecido,
-  filtro "Todos / Ação humana / Sistema" na toolbar de resultados); `version`
-  do Directory marcado como ruído no diff; na aba "Por pessoa" os 4 serviços
-  com eventos confirmados ficam em destaque e os demais colapsados atrás de
-  um toggle; progresso do fan-out vira stat cards por serviço.
+- `auditFormat.js` — o §4 deste dicionário em código (parsing QueueMember,
+  Role, sentinelas, frase legível).
+- `AuditTimeline.vue` / `AuditTokens.vue` — timeline e tokens da UI antiga
+  (USER vs SYSTEM, abas, fan-out multi-serviço). Histórico apenas.
+- `frontend/src/composables/useUserNames.js` — ainda ativo: re-export de
+  `useEntityNames.js` (ver "Resolução de nomes" abaixo). Fonte de nome:
+  `GET /users/{id}/name` (leve).
 
-A busca "Por pessoa" faz fan-out concorrente (até 3 serviços em paralelo)
-usando `/audits/search/deep`, com autocomplete de usuário
-(`GET /users/autocomplete?q=`) e deep-link via `?userId=&name=`.
+A Trilha atual consolida via `POST /audits/user-changes` (divisão + deep por
+categoria), com autocomplete (`GET /users/autocomplete?q=`).
 
 ### Resolução de nomes (usuários, roles, grupos, divisões)
 
@@ -535,13 +528,14 @@ UUIDs na timeline viram nomes reais por caminhos escolhidos pelo custo:
 - **Role/grupo/divisão — cache bulk:** `ensureBulk()` busca o mapa inteiro
   **uma vez por sessão** (guardado por flag + promessa in-flight) e prima
   todos os nomes; a partir daí todo chip/pílula daquele tipo resolve de graça.
-- `auditFormat.js` normaliza os 4 entityTypes do serviço Groups
+- `docs/arquivo/frontend-audit-legado/auditFormat.js` normalizava os 4 entityTypes do serviço Groups
   (`DirectoryGroup`/`SkillGroup`/`Team`/`SkillGroupDefinition`) para o hint
   `'group'`; o token de role já sai com hint `'role'`.
 - **Divisão é um caso à parte:** não aparece como token na frase do evento
   (`describeEvent()`), e sim como `propertyChanges[].property === 'divisionId'`
-  no diff genérico (`Directory/User Update`, valores antigo/novo). `AuditTokens.vue`
-  dispara `ensureBulk()` de role/grupo com base nos tokens da frase; como o diff
+  no diff genérico (`Directory/User Update`, valores antigo/novo). O legado
+  `AuditTokens.vue` (agora em `docs/arquivo/frontend-audit-legado/`)
+  disparava `ensureBulk()` de role/grupo com base nos tokens da frase; como o diff
   de `divisionId` não passa pelo sistema de tokens, `formatChanges()` (que
   monta as linhas do diff) dispara `ensureBulk()` de divisões direto, só quando
   há um `divisionId` no evento, e troca o UUID pelo nome resolvido na pílula
@@ -584,9 +578,9 @@ os gotchas). Resumo do que foi implementado:
   `memberCount` (mesmo `correlationId`) e anotam `_groupMembershipDirection`;
   a segunda função cobre o caso em que o filtro `UserId` já descartou o
   `memberCount` antes de chegar no backend, com uma consulta extra por grupo.
-- `frontend/src/utils/auditFormat.js` — `describeEvent()` e `formatChanges()`
-  usam `ev._groupMembershipDirection` em vez de inferir pela forma do
-  `oldValues`/`newValues` (que é sempre a mesma nos dois casos).
+- Legado `docs/arquivo/frontend-audit-legado/auditFormat.js` —
+  `describeEvent()` / `formatChanges()` usavam `_groupMembershipDirection`
+  em vez de inferir pela forma do `oldValues`/`newValues`.
 - Validado ponta a ponta contra a Genesys real (não só dado sintético):
   chamada direta de `search_audits()` dentro do container rodando, contra o
   caso de teste real (adicionar e depois remover a si mesmo de um grupo) —
