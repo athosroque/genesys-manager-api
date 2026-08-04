@@ -93,18 +93,17 @@ def create_magic_link_token(
     return raw
 
 
-def consume_magic_link_token(raw_token: str, purpose: str = "login") -> Optional[str]:
-    """
-    Valida e consome o token (marca used_at).
-    Retorna o username em caso de sucesso, ou None se inválido/expirado/já usado.
-    """
+def _find_valid_entry(
+    raw_token: str,
+    purpose: str,
+    tokens: list[dict],
+    now: datetime,
+) -> Optional[dict]:
+    """Localiza entrada válida (não usada, não expirada) sem mutar o store."""
     if not raw_token:
         return None
 
     token_hash = hash_token(raw_token)
-    tokens = cleanup_expired()
-    now = _now()
-
     for entry in tokens:
         if entry.get("token_hash") != token_hash:
             continue
@@ -115,9 +114,32 @@ def consume_magic_link_token(raw_token: str, purpose: str = "login") -> Optional
         expires_at = _parse_dt(entry.get("expires_at"))
         if not expires_at or expires_at < now:
             return None
-
-        entry["used_at"] = now.isoformat()
-        _save(tokens)
-        return entry.get("username")
-
+        return entry
     return None
+
+
+def peek_magic_link_token(raw_token: str, purpose: str = "login") -> Optional[str]:
+    """
+    Valida o token sem consumir (não marca used_at).
+    Usado no GET de landing — scanners/prefetch não queimam o link.
+    Retorna o username ou None se inválido/expirado/já usado.
+    """
+    tokens = cleanup_expired()
+    entry = _find_valid_entry(raw_token, purpose, tokens, _now())
+    return entry.get("username") if entry else None
+
+
+def consume_magic_link_token(raw_token: str, purpose: str = "login") -> Optional[str]:
+    """
+    Valida e consome o token (marca used_at).
+    Retorna o username em caso de sucesso, ou None se inválido/expirado/já usado.
+    """
+    tokens = cleanup_expired()
+    now = _now()
+    entry = _find_valid_entry(raw_token, purpose, tokens, now)
+    if not entry:
+        return None
+
+    entry["used_at"] = now.isoformat()
+    _save(tokens)
+    return entry.get("username")

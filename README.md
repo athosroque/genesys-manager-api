@@ -53,10 +53,27 @@ Originalmente um script manual no Google Colab, a gestão de usuários no Genesy
 | Login | Passwordless: `POST /auth/login` com e-mail → magic link |
 | Domínio | Somente `@{ALLOWED_EMAIL_DOMAIN}` (padrão: `claro.com.br`) |
 | Cadastro | Usuário **precisa** estar em `users.json` (admin cria ou edição manual). Ter o domínio não basta. |
-| Link | Uso único, hash SHA-256 em `auth_tokens.json`, TTL **10 min** (`MAGIC_LINK_EXPIRE_MINUTES`) |
+| Link | Uso único, hash SHA-256 em `auth_tokens.json`, TTL **10 min** (`MAGIC_LINK_EXPIRE_MINUTES`) — distinto da sessão JWT |
+| Verify (anti-scanner) | `GET` / `HEAD` só *peek* (não consomem); `POST /auth/verify` é o único que consome e seta o cookie |
+| Frontend | Ao montar `/login?token=...`, auto-POST e UI “Entrando…” (sem botão de confirmação) |
 | Sessão | Cookie `access_token` HttpOnly; idle **48h** (`JWT_EXPIRE_MINUTES=2880`), renovado a cada request autenticado |
+| Persistência | `users.json` e `auth_tokens.json` com bind mounts no `docker-compose.yml` (sobrevivem a recreate) |
 | E-mail | Resend (`RESEND_*`); FROM em domínio verificado (ex.: `noreply@projetoathos.com.br`) |
 | Admin | Rotas `/auth/users*` exigem `role: admin` |
+
+### Fluxo do magic link (anti-prefetch)
+
+Scanners de e-mail (Cisco Umbrella, Microsoft Safe Links, etc.) fazem `GET`/`HEAD`
+no link antes do clique real. Se o token de uso único fosse consumido no GET, o
+operador receberia “link inválido”. Por isso o consumo ficou no POST, que só o
+JS do browser dispara:
+
+1. E-mail com link `{APP_BASE_URL}/api/auth/verify?token=...`
+2. `GET /auth/verify` — valida (*peek*), **não consome**; 302 → `/login?token=...`
+   ou `/login?error=invalid_link` (sem JSON cru no browser)
+3. `HEAD /auth/verify` — resposta sem consumir (Safe Links)
+4. SPA monta `/login?token=...` → auto `POST /auth/verify` `{ "token" }` → cookie JWT
+5. Sessão idle 48h (sliding); TTL do link continua 10 min
 
 Detalhes e riscos residuais: [backend/README.md](backend/README.md#segurança).
 

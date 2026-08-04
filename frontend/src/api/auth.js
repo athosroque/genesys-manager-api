@@ -25,11 +25,18 @@ async function request(endpoint, options = {}) {
     return response.json()
 }
 
-/** Solicita magic link por e-mail. Não estabelece sessão — isso ocorre no clique do link. */
+/** Solicita magic link por e-mail. Não estabelece sessão — isso ocorre no POST /auth/verify. */
 export const requestLoginLink = (email) =>
     request('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email })
+    })
+
+/** Consome o magic link (POST seta o cookie de sessão). Chamado automaticamente ao abrir ?token=. */
+export const confirmMagicLink = (token) =>
+    request('/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({ token })
     })
 
 export const logout = () => request('/auth/logout', { method: 'POST' })

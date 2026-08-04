@@ -149,7 +149,7 @@ def test_resend_failure_message_domain_restriction():
 
 
 @pytest.mark.asyncio
-async def test_verify_expired_token_fails(auth_env):
+async def test_verify_expired_token_redirects_to_login_error(auth_env):
     raw = token_store.create_magic_link_token("alice", expire_minutes=10)
     # Força expiração no passado
     tokens = json.loads(auth_env["tokens_file"].read_text(encoding="utf-8"))["tokens"]
@@ -158,28 +158,50 @@ async def test_verify_expired_token_fails(auth_env):
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.get(f"/auth/verify?token={raw}", follow_redirects=False)
-    assert response.status_code == 400
+    assert response.status_code == 302
+    assert "error=invalid_link" in response.headers["location"]
 
 
 @pytest.mark.asyncio
-async def test_verify_used_token_fails(auth_env):
+async def test_verify_used_token_redirects_to_login_error(auth_env):
     raw = token_store.create_magic_link_token("alice")
     assert token_store.consume_magic_link_token(raw) == "alice"
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.get(f"/auth/verify?token={raw}", follow_redirects=False)
-    assert response.status_code == 400
+    assert response.status_code == 302
+    assert "error=invalid_link" in response.headers["location"]
 
 
 @pytest.mark.asyncio
-async def test_verify_sets_session_and_redirects(auth_env):
+async def test_verify_get_does_not_consume_token(auth_env):
+    """GET é landing (anti-prefetch): redireciona com token e NÃO marca used_at."""
     raw = token_store.create_magic_link_token("alice")
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.get(f"/auth/verify?token={raw}", follow_redirects=False)
 
     assert response.status_code == 302
-    assert response.headers["location"] == "https://genesys.example.com/"
+    location = response.headers["location"]
+    assert location.startswith("https://genesys.example.com/login?token=")
+    assert "access_token" not in response.cookies
+
+    # Token ainda utilizável
+    assert token_store.peek_magic_link_token(raw) == "alice"
+    tokens = json.loads(auth_env["tokens_file"].read_text(encoding="utf-8"))["tokens"]
+    assert tokens[0]["used_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_verify_post_sets_session(auth_env):
+    raw = token_store.create_magic_link_token("alice")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post("/auth/verify", json={"token": raw})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["user"]["username"] == "alice"
     assert "access_token" in response.cookies
 
     cookie_token = response.cookies["access_token"]
@@ -189,6 +211,33 @@ async def test_verify_sets_session_and_redirects(auth_env):
         algorithms=[settings.JWT_ALGORITHM],
     )
     assert payload["sub"] == "alice"
+
+    # Segundo POST falha (uso único)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        again = await ac.post("/auth/verify", json={"token": raw})
+    assert again.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_verify_post_used_token_fails(auth_env):
+    raw = token_store.create_magic_link_token("alice")
+    assert token_store.consume_magic_link_token(raw) == "alice"
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post("/auth/verify", json={"token": raw})
+    assert response.status_code == 400
+    assert "já utilizado" in response.json()["detail"].lower() or "inválido" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_verify_head_does_not_consume(auth_env):
+    raw = token_store.create_magic_link_token("alice")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.head(f"/auth/verify?token={raw}")
+
+    assert response.status_code == 204
+    assert token_store.peek_magic_link_token(raw) == "alice"
 
 
 @pytest.mark.asyncio

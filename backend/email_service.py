@@ -87,6 +87,8 @@ def send_magic_link(to_email: str, raw_token: str) -> None:
         </a>
       </p>
       <p style="color:#666;font-size:13px;">
+        Ao abrir o link no navegador, o acesso é concluído automaticamente.
+        Scanners de e-mail não consomem o link.<br><br>
         Se o botão não funcionar, copie e cole este endereço no navegador:<br>
         <a href="{link}">{link}</a>
       </p>

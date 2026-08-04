@@ -13,8 +13,22 @@
         <p class="text-sm text-gray-500 mt-1 font-mono">sae1.pure.cloud</p>
       </div>
 
+      <!-- Auto-login do magic link (POST consome o token; GET só redireciona) -->
+      <div v-if="autoLoggingIn" class="text-center space-y-4">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-600/10 border border-blue-500/20 mb-2">
+          <svg class="animate-spin h-7 w-7 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+        <h2 class="text-lg font-semibold text-white">Entrando…</h2>
+        <p class="text-sm text-gray-400 leading-relaxed">
+          Validando seu link de acesso. Aguarde um instante.
+        </p>
+      </div>
+
       <!-- Estado de sucesso: verifique seu e-mail -->
-      <div v-if="sent" class="text-center space-y-4">
+      <div v-else-if="sent" class="text-center space-y-4">
         <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-600/10 border border-emerald-500/20 mb-2">
           <svg class="w-7 h-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -86,15 +100,24 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { requestLoginLink } from '../api/auth'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { requestLoginLink, confirmMagicLink } from '../api/auth'
+import { useAuth } from '../composables/useAuth'
 
 const ALLOWED_DOMAIN = '@claro.com.br'
+const INVALID_LINK_MSG =
+  'Link inválido, expirado ou já utilizado. Solicite um novo acesso.'
+
+const route = useRoute()
+const router = useRouter()
+const { checkAuth } = useAuth()
 
 const email = ref('')
 const loading = ref(false)
 const error = ref('')
 const sent = ref(false)
+const autoLoggingIn = ref(false)
 
 function isAllowedEmail(value) {
   return value.trim().toLowerCase().endsWith(ALLOWED_DOMAIN)
@@ -105,6 +128,38 @@ function resetForm() {
   error.value = ''
   loading.value = false
 }
+
+async function completeMagicLinkLogin(token) {
+  autoLoggingIn.value = true
+  error.value = ''
+
+  try {
+    await confirmMagicLink(token)
+    await checkAuth()
+    await router.replace({ name: 'Home' })
+  } catch (err) {
+    autoLoggingIn.value = false
+    error.value =
+      typeof err.message === 'string' && err.message
+        ? err.message
+        : INVALID_LINK_MSG
+    // Token usado/expirado: limpa query e mostra formulário com erro
+    await router.replace({ name: 'Login', query: { error: 'invalid_link' } })
+  }
+}
+
+onMounted(() => {
+  const qError = route.query.error
+  const qToken = route.query.token
+
+  if (typeof qError === 'string' && qError) {
+    error.value = INVALID_LINK_MSG
+  }
+
+  if (typeof qToken === 'string' && qToken.trim()) {
+    completeMagicLinkLogin(qToken.trim())
+  }
+})
 
 async function handleSubmit() {
   loading.value = true

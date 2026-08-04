@@ -26,14 +26,37 @@ Camada dupla: sessão local (operadores) + proxy Genesys (credenciais de org).
 2. Domínio deve ser `@{ALLOWED_EMAIL_DOMAIN}` (padrão: `claro.com.br`).
 3. O e-mail **precisa** existir e estar `active` em `users.json`. Ter só o domínio **não** basta.
 4. Se o usuário existir, o backend gera um token de uso único (hash SHA-256 em
-   `auth_tokens.json`, TTL `MAGIC_LINK_EXPIRE_MINUTES` = 10), envia o link via
-   **Resend** e responde com mensagem genérica (não revela se o e-mail existe).
-5. O clique em `/api/auth/verify?token=...` consome o token, emite JWT e seta
-   cookie `access_token` (HttpOnly; Secure + SameSite=None em produção).
-6. Sessão idle **48h** (`JWT_EXPIRE_MINUTES=2880`), renovada a cada request
+   `auth_tokens.json`, TTL `MAGIC_LINK_EXPIRE_MINUTES` = 10 — distinto da sessão JWT),
+   envia o link via **Resend** (`{APP_BASE_URL}/api/auth/verify?token=...`) e
+   responde com mensagem genérica (não revela se o e-mail existe).
+5. O clique abre `GET /auth/verify?token=...`, que **não consome** o token:
+   faz *peek*, valida e redireciona (302) para o frontend
+   `/login?token=...` ou `/login?error=invalid_link` (sem JSON cru de erro no browser).
+6. A SPA (`LoginView`) monta com `?token=`, mostra “Entrando…” e dispara
+   automaticamente `POST /auth/verify` com `{ "token": "..." }` — **único** ponto
+   que consome o token, emite JWT e seta o cookie `access_token`
+   (HttpOnly; Secure + SameSite=None em produção). Sem botão de confirmação.
+7. Sessão idle **48h** (`JWT_EXPIRE_MINUTES=2880`), renovada a cada request
    autenticado (sliding session).
 
+#### Por que GET não autentica (anti-prefetch / scanners)
+
+Proxies de segurança de e-mail (Cisco Umbrella, Microsoft Safe Links, etc.)
+fazem `GET`/`HEAD` no link antes do usuário clicar. Se o consumo fosse no GET,
+o token de uso único morreria no scanner e o operador veria link inválido.
+Por isso:
+
+| Método | Comportamento |
+| :--- | :--- |
+| `GET /auth/verify` | *Peek* apenas → redirect para `/login?token=...` ou `?error=invalid_link` |
+| `HEAD /auth/verify` | Resposta sem corpo (204 se utilizável, 404 caso contrário); **não consome** |
+| `POST /auth/verify` | Consome o token, seta cookie JWT, devolve JSON (`Acesso autorizado.` + user) |
+
+Só o browser do usuário executa o JS da SPA e chama o POST.
+
 Arquivos sensíveis (gitignored): `users.json`, `auth_tokens.json`, `.env`.
+No Docker Compose, `users.json` e `auth_tokens.json` têm bind mount — sobrevivem
+a `docker compose up --force-recreate`.
 
 ### 2. Proxy Genesys (OAuth2 Client Credentials)
 
@@ -87,9 +110,11 @@ e `/auth/verify`.
 | Rota Interna | Método | Descrição |
 | :--- | :--- | :--- |
 | `/api/auth/login` | `POST` | Solicita magic link (resposta genérica) |
-| `/api/auth/verify` | `GET` | Consome token, seta cookie JWT, redirect ao frontend |
+| `/api/auth/verify` | `GET` | Landing: *peek* do token (não consome); 302 → `/login?token=...` ou `/login?error=invalid_link` |
+| `/api/auth/verify` | `HEAD` | Scanners (Safe Links): 204/404 sem consumir |
+| `/api/auth/verify` | `POST` | Consome token (`{ "token" }`), seta cookie JWT, JSON de sessão |
 | `/api/auth/logout` | `POST` | Remove cookie de sessão |
-| `/api/auth/me` | `GET` | Sessão atual (boot do frontend) |
+| `/api/auth/me` | `GET` | Sessão atual (boot do frontend; renova sliding) |
 | `/api/auth/users` | `GET` | Lista usuários locais (admin) |
 | `/api/auth/users` | `POST` | Cadastra usuário local (admin) |
 | `/api/auth/users/{username}` | `DELETE` | Remove usuário local (admin; não self / não último admin) |

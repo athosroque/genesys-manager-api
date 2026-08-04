@@ -1,7 +1,8 @@
 from typing import Literal, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from auth_local import (
     create_access_token,
@@ -18,13 +19,25 @@ from auth_local import (
 )
 from config import settings
 from email_service import send_magic_link
-from token_store import create_magic_link_token, consume_magic_link_token
+from token_store import (
+    create_magic_link_token,
+    consume_magic_link_token,
+    peek_magic_link_token,
+)
 
 router = APIRouter()
+
+LINK_INVALID_DETAIL = (
+    "Link inválido, expirado ou já utilizado. Solicite um novo acesso."
+)
 
 
 class LoginRequest(BaseModel):
     email: str = Field(..., min_length=3, description="E-mail corporativo @claro.com.br")
+
+
+class VerifyConfirmRequest(BaseModel):
+    token: str = Field(..., min_length=1, description="Token do magic link")
 
 
 class CreateLocalUserRequest(BaseModel):
@@ -105,17 +118,72 @@ async def login(payload: LoginRequest):
     }
 
 
+def _login_url(**query: str) -> str:
+    """Monta URL do frontend /login com query string."""
+    base = settings.APP_BASE_URL.rstrip("/") + "/login"
+    if not query:
+        return base
+    parts = [f"{k}={quote(v, safe='')}" for k, v in query.items()]
+    return f"{base}?{'&'.join(parts)}"
+
+
 @router.get("/verify")
-async def verify_magic_link(token: str):
+async def verify_magic_link_landing(token: str = ""):
     """
-    Consome o magic link (uso único, 10 min), seta cookie JWT (48h idle)
-    e redireciona para o frontend.
+    Landing do magic link — NÃO consome o token.
+
+    Prefetch/scanners de e-mail (Safe Links, Umbrella, etc.) só fazem GET;
+    redirecionamos para o frontend com o token na query. O consumo ocorre
+    apenas no POST /auth/verify (disparado pelo JS do browser do usuário).
     """
-    username = consume_magic_link_token(token, purpose="login")
+    username = peek_magic_link_token(token, purpose="login") if token else None
+    if not username:
+        return RedirectResponse(
+            url=_login_url(error="invalid_link"),
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    users = load_users()
+    user = next((u for u in users if u["username"] == username and u.get("active")), None)
+    if not user:
+        return RedirectResponse(
+            url=_login_url(error="invalid_link"),
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    return RedirectResponse(
+        url=_login_url(token=token),
+        status_code=status.HTTP_302_FOUND,
+    )
+
+
+@router.head("/verify")
+async def verify_magic_link_head(token: str = ""):
+    """
+    HEAD de scanners (ex.: Microsoft Safe Links) — não consome o token.
+    204 se o link ainda é utilizável; 404 caso contrário.
+    """
+    username = peek_magic_link_token(token, purpose="login") if token else None
+    if not username:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    users = load_users()
+    user = next((u for u in users if u["username"] == username and u.get("active")), None)
+    if not user:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/verify")
+async def confirm_magic_link(payload: VerifyConfirmRequest):
+    """
+    Consome o magic link (uso único): seta cookie JWT e devolve JSON
+    para o frontend completar o login. Único endpoint que autentica.
+    """
+    username = consume_magic_link_token(payload.token, purpose="login")
     if not username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Link inválido, expirado ou já utilizado. Solicite um novo acesso.",
+            detail=LINK_INVALID_DETAIL,
         )
 
     users = load_users()
@@ -123,14 +191,23 @@ async def verify_magic_link(token: str):
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Link inválido, expirado ou já utilizado. Solicite um novo acesso.",
+            detail=LINK_INVALID_DETAIL,
         )
 
     access_token = create_access_token(data={"sub": username})
-    redirect_url = settings.APP_BASE_URL.rstrip("/") + "/"
-    redirect = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
-    set_session_cookie(redirect, access_token)
-    return redirect
+    response = JSONResponse(
+        content={
+            "message": "Acesso autorizado.",
+            "user": {
+                "username": user["username"],
+                "full_name": user.get("full_name"),
+                "email": user.get("email"),
+                "role": user.get("role"),
+            },
+        }
+    )
+    set_session_cookie(response, access_token)
+    return response
 
 
 

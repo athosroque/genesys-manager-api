@@ -1193,7 +1193,8 @@
           </div>
           <p>
             Login passwordless por magic link (<span class="code-chip">@claro.com.br</span>, Resend,
-            link de 10&nbsp;min) e sessão JWT em cookie HttpOnly com idle de 48h (sliding).
+            link de 10&nbsp;min). GET/HEAD só validam (anti-scanner); o POST consome o token e
+            autentica. Sessão JWT em cookie HttpOnly com idle de 48h (sliding).
             Credenciais Genesys ficam só no backend via OAuth 2.0 Client Credentials.
             CORS por whitelist; cookies inacessíveis via JavaScript.
           </p>

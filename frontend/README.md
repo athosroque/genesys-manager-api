@@ -19,13 +19,29 @@ A interface do Genesys Manager é uma Single Page Application (SPA) construída 
 Login é **passwordless** (magic link). O frontend **não** guarda senha nem API keys
 (`RESEND_*`, Genesys OAuth, `JWT_SECRET_KEY` ficam só no backend).
 
+### Fluxo passo a passo
+
 1. `LoginView.vue` chama `requestLoginLink(email)` → `POST /auth/login`.
-2. Mensagem genérica: “verifique seu e-mail” (link válido ~10 min).
-3. O clique no link bate no backend (`/api/auth/verify`), que seta o cookie
-   HttpOnly e redireciona para a SPA.
-4. No boot, `useAuth.checkAuth()` usa `GET /auth/me` (cookie `credentials: include`).
-5. Sessão idle **48h** (sliding no backend a cada request autenticado).
-6. Logout: `POST /auth/logout` + limpa estado local.
+2. Mensagem genérica: “Verifique seu e-mail” (link válido ~10 min —
+   `MAGIC_LINK_EXPIRE_MINUTES`, distinto da sessão JWT).
+3. O link do e-mail aponta para `GET /api/auth/verify?token=...`. O backend
+   **não consome** o token: só valida (*peek*) e redireciona para
+   `/login?token=...` ou `/login?error=invalid_link`.
+4. Ao montar `/login?token=...`, a SPA auto-dispara `confirmMagicLink(token)` →
+   `POST /auth/verify` (mostra “Entrando…” — **sem** botão “Confirmar acesso”).
+   Só o POST consome o token e seta o cookie HttpOnly `access_token`.
+5. Em seguida `useAuth.checkAuth()` → `GET /auth/me` (`credentials: include`)
+   e navega para a Home.
+6. Sessão idle **48h** (`JWT_EXPIRE_MINUTES=2880`, sliding no backend a cada
+   request autenticado).
+7. Logout: `POST /auth/logout` + limpa estado local.
+
+**Por quê POST e não GET?** Scanners de e-mail (Cisco Umbrella, Safe Links)
+fazem GET/HEAD e queimavam links de uso único. O browser do usuário executa JS
+e é o único a chamar o POST. `HEAD /auth/verify` no backend também não consome.
+
+Erros de link: query `error=invalid_link` ou falha no POST → mensagem
+“Link inválido, expirado ou já utilizado. Solicite um novo acesso.”
 
 Requisitos de acesso: e-mail `@claro.com.br` **e** cadastro prévio em `users.json`
 (admin cria na tela ou edição manual no backend). Domínio sozinho não basta.
@@ -59,7 +75,8 @@ O frontend utiliza o padrão de **Composables** para encapsular lógica de negó
 1.  **useAuth.js**:
     - Estado do usuário (`user`, `isAuthenticated`) e `logout`.
     - Boot via `/auth/me` (sessão por cookie HttpOnly).
-    - Pedido de magic link fica em `LoginView` + `api/auth.js` (`requestLoginLink`).
+    - Pedido de magic link e consumo do token ficam em `LoginView` +
+      `api/auth.js` (`requestLoginLink`, `confirmMagicLink` → `POST /auth/verify`).
 
 2.  **useToast.js**:
     - Sistema de notificações globais.
