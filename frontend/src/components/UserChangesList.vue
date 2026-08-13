@@ -15,7 +15,7 @@
       </button>
       <span
         v-if="changes.length"
-        class="ml-auto text-xs font-medium text-gray-400 bg-gray-800 rounded-full px-3 py-1"
+        class="ml-auto text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-1"
       >
         {{ filtered.length }} de {{ changes.length }} alteração{{ changes.length === 1 ? '' : 'ões' }}
       </span>
@@ -23,12 +23,12 @@
 
     <div
       v-if="truncated || truncatedCategoryLabels.length"
-      class="space-y-1 text-xs text-amber-400/90"
+      class="space-y-1 text-xs text-amber-700"
       data-testid="truncated-warning"
     >
       <p v-if="truncatedCategoryLabels.length">
         Varredura parcial em
-        <span class="font-medium text-amber-300">{{ truncatedCategoryLabels.join(', ') }}</span>:
+        <span class="font-medium text-amber-800">{{ truncatedCategoryLabels.join(', ') }}</span>:
         a leitura parou ao atingir o teto (~2.500 eventos da organização por pedaço de tempo).
       </p>
       <p v-else>
@@ -46,7 +46,7 @@
       <article
         v-for="card in filtered"
         :key="card.id"
-        class="rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-3.5 space-y-3"
+        class="card px-4 py-3.5 space-y-3"
       >
         <!-- Membership binária (role/fila/grupo add|remove|activate|deactivate): só a frase -->
         <template v-if="isNarrativeCard(card)">
@@ -57,7 +57,7 @@
             >
               {{ categoryLabel(card.category) }}
             </span>
-            <p class="text-sm text-gray-100 leading-snug break-words">
+            <p class="text-sm text-ink leading-snug break-words">
               {{ narrativeSentence(card) }}
             </p>
           </div>
@@ -74,10 +74,10 @@
                 {{ categoryLabel(card.category) }}
               </span>
               <div class="min-w-0">
-                <p class="text-sm font-semibold text-gray-100 truncate">
+                <p class="text-sm font-semibold text-ink truncate">
                   {{ card.resource?.name || card.resource?.id || 'Recurso' }}
                 </p>
-                <p v-if="card.action" class="text-xs text-gray-500 mt-0.5">
+                <p v-if="card.action" class="text-xs text-gray-400 mt-0.5">
                   {{ actionLabel(card.action) }}
                 </p>
               </div>
@@ -85,23 +85,23 @@
           </div>
 
           <div class="flex flex-wrap items-stretch gap-2 text-xs sm:gap-3">
-            <div class="min-w-[8rem] flex-1 rounded-lg bg-gray-800/70 border border-gray-800 px-3 py-2">
-              <p class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Antes</p>
-              <p class="text-gray-200 break-words">{{ displayValue(card.before) }}</p>
+            <div class="min-w-[8rem] flex-1 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2">
+              <p class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Antes</p>
+              <p class="text-ink break-words">{{ displayValue(card.before) }}</p>
             </div>
-            <div class="hidden sm:flex items-center text-gray-600 shrink-0" aria-hidden="true">→</div>
-            <div class="min-w-[8rem] flex-1 rounded-lg bg-gray-800/70 border border-gray-800 px-3 py-2">
-              <p class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Depois</p>
-              <p class="text-gray-200 break-words">{{ displayValue(card.after) }}</p>
+            <div class="hidden sm:flex items-center text-gray-300 shrink-0" aria-hidden="true">→</div>
+            <div class="min-w-[8rem] flex-1 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2">
+              <p class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Depois</p>
+              <p class="text-ink break-words">{{ displayValue(card.after) }}</p>
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
             <p>
-              <span class="text-gray-500">Alterado por</span>
+              <span class="text-gray-400">Alterado por</span>
               {{ changedByLabel(card.changed_by) }}
             </p>
-            <p class="font-mono text-gray-500">{{ formatEventDate(card.event_date) }}</p>
+            <p class="font-mono text-gray-400">{{ formatEventDate(card.event_date) }}</p>
           </div>
         </template>
       </article>
@@ -109,7 +109,7 @@
 
     <div
       v-else
-      class="rounded-xl border border-dashed border-gray-700 p-6 text-center text-sm text-gray-500"
+      class="rounded-2xl border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-400"
     >
       Nenhuma alteração nesta categoria — escolha “Todas” ou outro filtro.
     </div>
@@ -271,11 +271,11 @@ function narrativeSentence(card) {
 }
 
 function categoryBadgeClass(category) {
-  if (category === 'group') return 'bg-violet-900/40 text-violet-300 border-violet-800/50'
-  if (category === 'role') return 'bg-blue-900/40 text-blue-300 border-blue-800/50'
-  if (category === 'division') return 'bg-amber-900/40 text-amber-300 border-amber-800/50'
-  if (category === 'queue') return 'bg-teal-900/40 text-teal-300 border-teal-800/50'
-  return 'bg-gray-800 text-gray-300 border-gray-700'
+  if (category === 'group') return 'bg-violet-50 text-violet-700 border-violet-200'
+  if (category === 'role') return 'bg-brand-soft text-brand border-brand/20'
+  if (category === 'division') return 'bg-amber-50 text-amber-800 border-amber-200'
+  if (category === 'queue') return 'bg-teal-50 text-teal-700 border-teal-200'
+  return 'bg-gray-50 text-gray-600 border-gray-200'
 }
 </script>
 
@@ -284,9 +284,9 @@ function categoryBadgeClass(category) {
   @apply px-2.5 py-1 rounded-full text-xs font-medium border transition-colors inline-flex items-center gap-1.5;
 }
 .chip-on {
-  @apply bg-blue-600/20 border-blue-700 text-blue-300;
+  @apply bg-brand-soft border-brand/30 text-brand;
 }
 .chip-off {
-  @apply bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-200;
+  @apply bg-white border-gray-200 text-gray-500 hover:text-ink;
 }
 </style>

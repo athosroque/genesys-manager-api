@@ -1,64 +1,139 @@
 <template>
-  <div class="max-w-5xl mx-auto space-y-8">
+  <div class="space-y-8">
 
     <!-- Título -->
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold text-white tracking-tight">Consulta e Ações</h1>
-      <p class="text-sm text-gray-400 mt-1">Busque um usuário para visualizar seus dados e executar ações na Genesys Cloud.</p>
+    <div class="mb-2">
+      <h1 class="text-2xl font-bold text-ink tracking-tight">Consulta e Ações</h1>
+      <p class="text-sm text-gray-500 mt-1">Busque um usuário para visualizar seus dados e executar ações na Genesys Cloud.</p>
     </div>
 
     <!-- Barra de Busca -->
     <SearchBar :loading="searchLoading" @search="handleSearch" />
 
     <!-- Estado Vazio Inicial -->
-    <div v-if="!searched" class="flex flex-col items-center justify-center py-24 text-center">
-      <div class="text-6xl mb-5 select-none">🔷</div>
-      <h2 class="text-xl font-semibold text-gray-300 mb-2">Busque um usuário para começar</h2>
+    <div v-if="!searched" class="card p-16 flex flex-col items-center justify-center text-center">
+      <div class="w-16 h-16 rounded-full bg-brand-soft flex items-center justify-center mb-5">
+        <BrandMark class="w-8 h-8" />
+      </div>
+      <h2 class="text-xl font-semibold text-ink mb-2">Busque um usuário para começar</h2>
       <p class="text-sm text-gray-500">Aceita matrícula, e-mail ou UUID</p>
     </div>
 
     <!-- Aviso: Não Encontrado -->
-    <div v-else-if="searched && !foundUser && !searchError && !searchLoading" class="rounded-xl border border-purple-800/60 bg-purple-900/20 p-5 flex items-start gap-4 text-purple-300">
-      <svg class="w-5 h-5 mt-0.5 shrink-0 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div v-else-if="searched && !foundUser && !searchError && !searchLoading" class="rounded-2xl border border-amber-200 bg-amber-50 p-5 flex items-start gap-4 text-amber-800">
+      <svg class="w-5 h-5 mt-0.5 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <div>
-        <p class="font-semibold text-purple-200">Usuário não encontrado</p>
-        <p class="text-sm text-purple-400 mt-0.5">Nenhum resultado para: <strong class="font-mono">{{ lastQuery }}</strong></p>
+        <p class="font-semibold text-amber-900">Usuário não encontrado</p>
+        <p class="text-sm text-amber-700 mt-0.5">Nenhum resultado para: <strong class="font-mono">{{ lastQuery }}</strong></p>
       </div>
     </div>
 
     <!-- Aviso: Erro -->
-    <div v-else-if="searchError" class="rounded-xl border border-red-800/60 bg-red-900/20 p-5 flex items-start gap-4 text-red-300">
-      <svg class="w-5 h-5 mt-0.5 shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div v-else-if="searchError" class="rounded-2xl border border-red-200 bg-red-50 p-5 flex items-start gap-4 text-red-700">
+      <svg class="w-5 h-5 mt-0.5 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <div>
-        <p class="font-semibold text-red-200">Erro na busca</p>
-        <p class="text-sm text-red-400 font-mono mt-0.5">{{ searchError }}</p>
+        <p class="font-semibold text-red-800">Erro na busca</p>
+        <p class="text-sm text-red-600 font-mono mt-0.5">{{ searchError }}</p>
       </div>
     </div>
 
     <!-- Resultado Principal -->
     <template v-else-if="user">
 
-      <!-- Card do Usuário -->
-      <UserCard
-        :user="user"
-        :queues="queues"
-        :loading="queuesLoading"
-        @remove-from-queue="onRemoveFromQueue"
-        @remove-all-queues="showQueuesConfirm = true"
-      />
+      <div class="grid grid-cols-1 xl:grid-cols-[minmax(260px,340px)_1fr] gap-6 items-start">
+        <UserCard :user="user" />
 
-      <div class="flex justify-end -mt-4">
-        <button
-          @click="goToAudit"
-          class="text-xs font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1.5"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-          Ver auditoria deste usuário
-        </button>
+        <div class="space-y-6 min-w-0">
+          <!-- Filas -->
+          <div class="card overflow-hidden">
+            <div
+              class="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-gray-50/60 transition-colors"
+              @click="queuesExpanded = !queuesExpanded"
+            >
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="p-2 rounded-xl bg-ice">
+                  <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <h3 class="text-sm font-semibold text-ink">
+                    Filas Configuradas na Plataforma
+                    (<span :class="queues.length > 0 ? 'text-brand' : 'text-gray-400'">{{ queues.length }}</span>)
+                  </h3>
+                  <p v-if="queuesLoading" class="text-xs text-brand mt-0.5 animate-pulse">Carregando filas do back-end...</p>
+                  <p v-else class="text-xs text-gray-400 mt-0.5">Gestão individual de participações</p>
+                </div>
+              </div>
+              <div class="p-2 text-gray-400 transition-transform duration-200" :class="queuesExpanded ? 'rotate-180' : ''">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+
+            <div v-show="queuesExpanded">
+              <div class="border-t border-gray-100" v-if="queues.length > 0">
+                <div class="max-h-64 overflow-y-auto">
+                  <table class="min-w-full divide-y divide-gray-100">
+                    <thead class="bg-gray-50/90 sticky top-0 z-10 backdrop-blur-sm">
+                      <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 tracking-wider">Nome da Fila</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 tracking-wider">Status</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 tracking-wider">System ID (UUID)</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-400 tracking-wider">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                      <tr v-for="q in queues" :key="q.id" class="hover:bg-peach/40 transition-colors">
+                        <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-ink">{{ q.name }}</td>
+                        <td class="px-6 py-3 whitespace-nowrap">
+                          <span
+                            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
+                            :class="q.joined ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'"
+                          >
+                            <span class="w-1.5 h-1.5 rounded-full" :class="q.joined ? 'bg-green-500' : 'bg-gray-400'" />
+                            {{ q.joined ? 'Ativo' : 'Inativo' }}
+                          </span>
+                        </td>
+                        <td class="px-6 py-3 whitespace-nowrap text-xs text-gray-400 font-mono text-ellipsis overflow-hidden max-w-[150px]">
+                          {{ q.id }}
+                        </td>
+                        <td class="px-6 py-3 whitespace-nowrap text-right">
+                          <button
+                            @click.stop="onRemoveFromQueue(q)"
+                            class="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 transition-all"
+                            title="Remover desta fila"
+                          >
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Remover
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div
+                v-else-if="!queuesLoading"
+                class="mx-5 mb-5 mt-1 rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 p-8 text-center text-gray-400 text-sm flex flex-col items-center gap-3"
+              >
+                <svg class="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                Usuário não está configurado em nenhuma fila da Plataforma
+              </div>
+            </div>
+          </div>
+
+          <PresencePanel :user-id="user.id" />
+        </div>
       </div>
 
       <!-- Confirm: Remoção Individual de Fila -->
@@ -75,22 +150,22 @@
 
       <!-- ──────────────────────────── SEÇÕES DE AÇÃO ──────────────────────────── -->
       <div class="space-y-4">
-        <h2 class="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+        <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
           Ações Disponíveis
         </h2>
 
         <!-- A) Reativação (apenas se INATIVO) -->
-        <div v-if="user.state === 'inactive'" class="rounded-xl border border-yellow-800/60 bg-yellow-900/10 p-5">
+        <div v-if="user.state === 'inactive'" class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
           <div class="flex items-center justify-between">
             <div>
-              <p class="font-semibold text-yellow-300 flex items-center gap-2">🔒 Usuário Inativo</p>
-              <p class="text-sm text-yellow-500 mt-1">Este usuário está desativado na Genesys Cloud.</p>
+              <p class="font-semibold text-amber-800 flex items-center gap-2">🔒 Usuário Inativo</p>
+              <p class="text-sm text-amber-700 mt-1">Este usuário está desativado na Genesys Cloud.</p>
             </div>
             <button
               v-if="!showReactivateConfirm"
               @click="showReactivateConfirm = true"
-              class="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex-shrink-0 ml-4"
+              class="btn-primary whitespace-nowrap flex-shrink-0 ml-4"
             >
               🔄 Reativar Usuário
             </button>
@@ -111,44 +186,44 @@
         <!-- B) Remover de Todas as Filas (REMOVIDO CONFORME SOLICITAÇÃO) -->
 
         <!-- C) Remover de um Grupo -->
-        <div v-if="user.groups && user.groups.length > 0" class="rounded-xl border border-gray-700 bg-gray-900/80 overflow-hidden">
+        <div v-if="user.groups && user.groups.length > 0" class="card overflow-hidden">
           <!-- Header -->
-          <div class="flex items-center gap-3 px-5 py-4 bg-gray-950/30">
-            <div class="p-2 rounded-lg bg-gray-900 border border-gray-700">
-              <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+            <div class="p-2 rounded-xl bg-ice">
+              <svg class="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
             <div>
-              <p class="text-sm font-semibold text-gray-200">
-                Grupos do Usuário (<span class="text-purple-400">{{ user.groups.length }}</span>)
+              <p class="text-sm font-semibold text-ink">
+                Grupos do Usuário (<span class="text-brand">{{ user.groups.length }}</span>)
               </p>
-              <p class="text-xs text-gray-500 mt-0.5">Remoção individual por grupo</p>
+              <p class="text-xs text-gray-400 mt-0.5">Remoção individual por grupo</p>
             </div>
           </div>
 
           <!-- Tabela -->
-          <div class="border-t border-gray-800">
-            <table class="min-w-full divide-y divide-gray-800/50">
-              <thead class="bg-gray-950/80">
+          <div class="border-t border-gray-100">
+            <table class="min-w-full divide-y divide-gray-100">
+              <thead class="bg-gray-50/80">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Nome do Grupo</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">System ID (UUID)</th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 tracking-wider">Ação</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 tracking-wider">Nome do Grupo</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 tracking-wider">System ID (UUID)</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-400 tracking-wider">Ação</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-800/30">
-                <tr v-for="g in user.groups" :key="typeof g === 'string' ? g : g.id" class="hover:bg-gray-800/30 transition-colors">
-                  <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-purple-200">
+              <tbody class="divide-y divide-gray-50">
+                <tr v-for="g in user.groups" :key="typeof g === 'string' ? g : g.id" class="hover:bg-peach/40 transition-colors">
+                  <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-ink">
                     {{ typeof g === 'string' ? g.substring(0, 12) : (g.name || '—') }}
                   </td>
-                  <td class="px-6 py-3 whitespace-nowrap text-xs text-gray-500 font-mono">
+                  <td class="px-6 py-3 whitespace-nowrap text-xs text-gray-400 font-mono">
                     {{ typeof g === 'string' ? g : g.id }}
                   </td>
                   <td class="px-6 py-3 whitespace-nowrap text-right">
                     <button
                       @click="groupToRemove = g"
-                      class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-red-400 bg-red-900/20 border border-red-800/40 rounded-md hover:bg-red-900/40 transition-all"
+                      class="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 transition-all"
                     >
                       <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       Remover
@@ -173,16 +248,16 @@
         />
 
         <!-- D) Migração (sempre visível após busca) -->
-        <div class="rounded-xl border border-blue-800/40 bg-blue-900/10 p-5">
-          <p class="font-semibold text-blue-300 mb-1">🚀 Executar Migração</p>
-          <p class="text-sm text-gray-400 mb-4">Atribuir divisão, role e/ou adicionar ao grupo de migração.</p>
+        <div class="card p-5">
+          <p class="font-semibold text-ink mb-1">🚀 Executar Migração</p>
+          <p class="text-sm text-gray-500 mb-4">Atribuir divisão, role e/ou adicionar ao grupo de migração.</p>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
-              <label class="block text-xs text-gray-500 mb-1.5">Operação</label>
+              <label class="block text-xs text-gray-400 mb-1.5">Operação</label>
               <select
                 v-model="migrationOp"
-                class="w-full bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="input"
               >
                 <option value="1">1 — Divisão Home + Role Employee</option>
                 <option value="2">2 — Adicionar ao Grupo</option>
@@ -191,10 +266,10 @@
             </div>
 
             <div v-if="migrationOp === '2' || migrationOp === '3'">
-              <label class="block text-xs text-gray-500 mb-1.5">Grupo de Migração</label>
+              <label class="block text-xs text-gray-400 mb-1.5">Grupo de Migração</label>
               <select
                 v-model="migrationGroupId"
-                class="w-full bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="input"
               >
                 <option value="">— escolha um grupo —</option>
                 <option 
@@ -212,7 +287,7 @@
             v-if="!showMigrationConfirm"
             @click="showMigrationConfirm = true"
             :disabled="(migrationOp === '2' || migrationOp === '3') && !migrationGroupId"
-            class="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+            class="btn-primary"
           >
             🚀 Executar Migração
           </button>
@@ -226,34 +301,34 @@
             @cancel="showMigrationConfirm = false"
             @confirm="handleMigration"
           >
-            <div class="text-sm text-gray-300 space-y-2 mb-4">
-              <div class="bg-gray-950/60 border border-gray-800 rounded-lg p-4 space-y-1.5 text-xs font-mono">
-                <p><span class="text-gray-500">Usuário:</span> {{ user.name }}</p>
-                <p><span class="text-gray-500">E-mail:</span> {{ user.email }}</p>
-                <p><span class="text-gray-500">UUID:</span> {{ user.id }}</p>
-                <p><span class="text-gray-500">Operação:</span> {{ migrationOpLabel }}</p>
-                <p v-if="migrationGroupId"><span class="text-gray-500">Grupo:</span> {{ migrationGroupLabel }}</p>
+            <div class="text-sm text-gray-600 space-y-2 mb-4">
+              <div class="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-1.5 text-xs font-mono">
+                <p><span class="text-gray-400">Usuário:</span> {{ user.name }}</p>
+                <p><span class="text-gray-400">E-mail:</span> {{ user.email }}</p>
+                <p><span class="text-gray-400">UUID:</span> {{ user.id }}</p>
+                <p><span class="text-gray-400">Operação:</span> {{ migrationOpLabel }}</p>
+                <p v-if="migrationGroupId"><span class="text-gray-400">Grupo:</span> {{ migrationGroupLabel }}</p>
               </div>
             </div>
           </ConfirmDialog>
 
           <!-- Resultado da migração por step -->
           <div v-if="migrationSteps.length > 0" class="mt-4 space-y-1.5">
-            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Resultado da Migração:</p>
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Resultado da Migração:</p>
             <div
               v-for="(step, i) in migrationSteps"
               :key="i"
-              class="flex items-start gap-2 text-sm px-3 py-2 rounded-lg"
+              class="flex items-start gap-2 text-sm px-3 py-2 rounded-xl"
               :class="{
-                'bg-green-900/20 text-green-300 border border-green-800/30': step.status === 'ok',
-                'bg-yellow-900/20 text-yellow-300 border border-yellow-800/30': step.status === 'skip',
-                'bg-red-900/20 text-red-300 border border-red-800/30': step.status === 'error',
+                'bg-green-50 text-green-800 border border-green-200': step.status === 'ok',
+                'bg-amber-50 text-amber-800 border border-amber-200': step.status === 'skip',
+                'bg-red-50 text-red-700 border border-red-200': step.status === 'error',
               }"
             >
               <span class="shrink-0 mt-0.5">{{ step.status === 'ok' ? '✅' : step.status === 'skip' ? '⚠️' : '❌' }}</span>
               <div>
                 <p class="font-medium leading-tight">{{ step.label }}</p>
-                <p class="text-xs opacity-60 mt-0.5">{{ step.detail }}</p>
+                <p class="text-xs opacity-70 mt-0.5">{{ step.detail }}</p>
               </div>
             </div>
           </div>
@@ -266,11 +341,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import SearchBar from '../components/SearchBar.vue'
 import UserCard from '../components/UserCard.vue'
+import PresencePanel from '../components/PresencePanel.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
-import LoadingSpinner from '../components/LoadingSpinner.vue'
+import BrandMark from '../components/BrandMark.vue'
 import { useToast } from '../composables/useToast'
 import {
   searchUser,
@@ -284,11 +359,6 @@ import {
 } from '../api/genesys'
 
 const { addToast } = useToast()
-const router = useRouter()
-
-function goToAudit() {
-  router.push({ path: '/auditoria', query: { userId: user.value.id, name: user.value.name } })
-}
 
 // ─── Estado de busca ───────────────────────────────────────────────────────
 const lastQuery    = ref('')
@@ -309,6 +379,7 @@ const migrationSteps         = ref([])
 const queueToRemove          = ref(null)  // fila selecionada para remoção individual
 const groupToRemove          = ref(null)  // grupo selecionado para remoção individual (tabela)
 const showQueuesConfirm      = ref(false) // mantido para lógica interna se necessário
+const queuesExpanded         = ref(true)
 
 // ─── Grupos e migração ────────────────────────────────────────────────────
 const migrationOp      = ref('1')
@@ -335,27 +406,37 @@ const migrationGroupLabel = computed(() => {
 })
 
 // ─── Busca ────────────────────────────────────────────────────────────────
-async function handleSearch(q) {
+/**
+ * @param {string} q
+ * @param {{ soft?: boolean }} [opts] soft=true mantém o card/painel montados
+ *   durante o refetch pós-ação (evita perder o Status na plataforma).
+ */
+async function handleSearch(q, { soft = false } = {}) {
   lastQuery.value   = q
   searched.value    = true
-  foundUser.value   = false
   searchError.value = ''
-  user.value        = null
-  queues.value      = []
-  migrationSteps.value = []
-  searchLoading.value  = true
+  if (!soft) {
+    foundUser.value = false
+    user.value = null
+    queues.value = []
+    migrationSteps.value = []
+  }
+  searchLoading.value = true
 
   try {
     const data = await searchUser(q)
     if (!data.found) {
       foundUser.value = false
+      user.value = null
+      queues.value = []
       return
     }
     foundUser.value = true
-    user.value      = data.user
+    user.value = data.user
     fetchQueues(data.user.id)
   } catch (err) {
     searchError.value = err.message
+    if (!soft) user.value = null
     addToast(err.message, 'error')
   } finally {
     searchLoading.value = false
@@ -376,7 +457,8 @@ async function fetchQueues(userId) {
 
 async function refetch() {
   if (!lastQuery.value) return
-  await handleSearch(lastQuery.value)
+  // Soft: não zera `user` → PresencePanel permanece montado / cache por userId.
+  await handleSearch(lastQuery.value, { soft: true })
 }
 
 // ─── Ações ────────────────────────────────────────────────────────────────

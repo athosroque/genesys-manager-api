@@ -1,5 +1,5 @@
 <template>
-  <section class="rounded-xl border border-gray-700 bg-gray-900/80 divide-y divide-gray-800">
+  <section class="card divide-y divide-gray-100">
     <!-- Pessoa -->
     <div class="p-5 space-y-3">
       <p class="section-label">Pessoa</p>
@@ -14,16 +14,16 @@
         />
         <ul
           v-if="suggestions.length"
-          class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-700 bg-gray-900 shadow-xl"
+          class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-card"
         >
           <li
             v-for="u in suggestions"
             :key="u.id"
-            class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-800 cursor-pointer"
+            class="px-3 py-2 text-sm text-ink hover:bg-peach cursor-pointer"
             @click="selectUser(u)"
           >
             <p class="font-medium">{{ u.name }}</p>
-            <p v-if="u.email || u.state" class="text-xs text-gray-500">
+            <p v-if="u.email || u.state" class="text-xs text-gray-400">
               {{ u.email }}<span v-if="u.email && u.state"> · </span>{{ u.state }}
             </p>
           </li>
@@ -32,23 +32,23 @@
 
       <div
         v-if="selected"
-        class="flex items-center gap-3 rounded-lg border border-green-800/40 bg-green-900/10 px-3 py-2 max-w-2xl"
+        class="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 max-w-2xl"
       >
         <span
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-700
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-600
                  text-xs font-bold text-white"
         >
           {{ initialsOf(selected.name) }}
         </span>
         <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium text-green-300 truncate">{{ selected.name }}</p>
+          <p class="text-sm font-medium text-green-800 truncate">{{ selected.name }}</p>
           <p class="text-xs text-gray-500 font-mono truncate">
             {{ selected.email || selected.id }}
           </p>
         </div>
         <button
           type="button"
-          class="text-gray-500 hover:text-gray-200 text-lg leading-none px-1"
+          class="text-gray-400 hover:text-ink text-lg leading-none px-1"
           title="Remover seleção"
           :disabled="anyLoading"
           @click="clearSelected"
@@ -78,7 +78,7 @@
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
         <label class="block">
-          <span class="text-xs text-gray-500">De</span>
+          <span class="text-xs text-gray-400">De</span>
           <input
             v-model="period.start"
             type="datetime-local"
@@ -88,7 +88,7 @@
           />
         </label>
         <label class="block">
-          <span class="text-xs text-gray-500">Até</span>
+          <span class="text-xs text-gray-400">Até</span>
           <input
             v-model="period.end"
             type="datetime-local"
@@ -104,33 +104,33 @@
     <div class="p-5 space-y-3">
       <p class="section-label">Como funciona</p>
       <div
-        class="max-w-2xl rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-2.5
-               text-xs leading-relaxed text-gray-300 space-y-2"
+        class="max-w-2xl rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5
+               text-xs leading-relaxed text-gray-600 space-y-2"
         role="note"
       >
         <ul class="list-disc list-outside pl-4 space-y-1.5">
           <li>
-            <span class="font-medium text-gray-200">Pesquisar (divisão):</span>
+            <span class="font-medium text-ink">Pesquisar (divisão):</span>
             mudanças de divisão do usuário (de qual divisão para qual), quem alterou e quando.
             Filtro direto na Genesys — rápido.
           </li>
           <li>
-            <span class="font-medium text-gray-200">Buscar filas:</span>
+            <span class="font-medium text-ink">Buscar filas:</span>
             quando o usuário foi adicionado/removido/ativado/desativado em filas;
             quem fez e quando; qual fila.
           </li>
           <li>
-            <span class="font-medium text-gray-200">Buscar roles:</span>
+            <span class="font-medium text-ink">Buscar roles:</span>
             quando o usuário ganhou/perdeu roles; quem atribuiu/removeu e quando; qual role.
           </li>
           <li>
-            <span class="font-medium text-gray-200">Buscar grupos:</span>
+            <span class="font-medium text-ink">Buscar grupos:</span>
             quando o usuário foi adicionado/removido de grupos; quem fez e quando; qual grupo.
           </li>
         </ul>
-        <p class="text-gray-300 border-t border-gray-700/80 pt-2">
+        <p class="text-gray-600 border-t border-gray-200 pt-2">
           Filas, roles e grupos são
-          <span class="font-medium text-gray-200">buscas profundas</span>
+          <span class="font-medium text-ink">buscas profundas</span>
           (opcionais e independentes): varrem o histórico da organização e só depois
           filtram a pessoa — mais lentas e, com muito volume, podem truncar parte do histórico.
           A Genesys não filtra esses serviços direto pela pessoa.
@@ -156,7 +156,7 @@
         >
           Cancelar
         </button>
-        <p v-if="localError" class="text-sm text-red-400 font-medium">{{ localError }}</p>
+        <p v-if="localError" class="text-sm text-red-600 font-medium">{{ localError }}</p>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
@@ -199,8 +199,6 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   /** Categoria deep em andamento: 'queue' | 'role' | 'group' | null */
   loadingCategory: { type: String, default: null },
-  /** Prefill vindo da rota (?userId=&name=) */
-  initialUser: { type: Object, default: null },
 })
 
 const emit = defineEmits(['search', 'deep-search', 'clear', 'cancel'])
@@ -225,21 +223,6 @@ const anyLoading = computed(() => !!props.loading || !!props.loadingCategory)
 
 let suppressQueryWatch = false
 let debounceTimer = null
-
-watch(
-  () => props.initialUser,
-  (u) => {
-    if (u?.id && u.id !== selected.value?.id) {
-      selected.value = { id: u.id, name: u.name || u.id, email: u.email || '' }
-      if (query.value !== '') {
-        suppressQueryWatch = true
-        query.value = ''
-      }
-      suggestions.value = []
-    }
-  },
-  { immediate: true },
-)
 
 watch(query, (q) => {
   if (suppressQueryWatch) {
@@ -343,30 +326,30 @@ defineExpose({ updateSelected, selected, period, emitSearch })
 
 <style scoped>
 .input {
-  @apply w-full bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3 py-2.5 text-sm
-         focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50;
+  @apply w-full bg-white border border-gray-200 text-ink rounded-xl px-3 py-2.5 text-sm
+         focus:outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand disabled:opacity-50;
 }
 .section-label {
-  @apply text-[11px] font-semibold uppercase tracking-wider text-gray-500;
+  @apply text-[11px] font-semibold uppercase tracking-wider text-gray-400;
 }
 .btn-primary {
-  @apply px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed
-         text-white text-sm font-medium rounded-lg transition-colors;
+  @apply px-5 py-2 bg-brand hover:bg-brand-hover disabled:opacity-40 disabled:cursor-not-allowed
+         text-white text-sm font-semibold rounded-full transition-colors;
 }
 .btn-secondary {
-  @apply px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-600
+  @apply px-4 py-1.5 bg-white hover:bg-gray-50 border border-gray-200
          disabled:opacity-40 disabled:cursor-not-allowed
-         text-gray-200 text-sm font-medium rounded-lg transition-colors;
+         text-ink text-sm font-semibold rounded-full transition-colors;
 }
 .btn-cancel {
-  @apply px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-500
-         text-gray-200 text-sm font-medium rounded-lg transition-colors;
+  @apply px-5 py-2 bg-white hover:bg-gray-50 border border-gray-200
+         text-ink text-sm font-semibold rounded-full transition-colors;
 }
 .preset-btn {
-  @apply px-2 py-1 rounded-md text-xs font-medium bg-gray-800 border border-gray-700
-         text-gray-400 hover:text-gray-200 hover:border-gray-500 transition-colors;
+  @apply px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-gray-200
+         text-gray-500 hover:text-ink hover:border-gray-300 transition-colors;
 }
 .preset-active {
-  @apply bg-blue-600/20 border-blue-700 text-blue-300;
+  @apply bg-brand-soft border-brand/30 text-brand;
 }
 </style>

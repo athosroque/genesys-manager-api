@@ -1,9 +1,8 @@
 <template>
-  <div class="max-w-3xl mx-auto space-y-5">
+  <div class="space-y-5">
     <div class="mb-1">
-      <p class="text-xs font-semibold uppercase tracking-widest text-blue-400">Governança</p>
-      <h1 class="text-2xl font-bold text-white tracking-tight">Trilha de Auditoria</h1>
-      <p class="text-sm text-gray-400 mt-1">
+      <h1 class="text-2xl font-bold text-ink tracking-tight">Trilha de Auditoria</h1>
+      <p class="text-sm text-gray-500 mt-1">
         Comece pela divisão (rápido). Depois, se precisar, busque filas, roles ou grupos
         separadamente — cada busca profunda varre a organização naquele serviço.
       </p>
@@ -13,19 +12,18 @@
       ref="searchBar"
       :loading="loadingBase"
       :loading-category="loadingCategory"
-      :initial-user="initialUser"
       @search="runBaseSearch"
       @deep-search="runDeepSearch"
       @clear="onClear"
       @cancel="cancelSearch"
     />
 
-    <p v-if="error" class="text-sm text-red-400 font-medium">{{ error }}</p>
+    <p v-if="error" class="text-sm text-red-600 font-medium">{{ error }}</p>
 
     <!-- Feedback de busca vazia com lista já preenchida (ex.: deep sem matches novos) -->
     <div
       v-if="emptyNotice && changes.length && !error && !loadingBase && !loadingCategory"
-      class="rounded-lg border border-gray-700 bg-gray-800/60 px-3.5 py-2.5 text-sm text-gray-300"
+      class="rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-600"
       role="status"
       data-testid="empty-notice-banner"
     >
@@ -34,20 +32,20 @@
 
     <!-- Skeleton só na primeira carga (sem cards ainda) -->
     <div v-if="loadingBase && !changes.length" class="space-y-3">
-      <div v-for="i in 4" :key="i" class="h-20 rounded-xl bg-gray-800/60 animate-pulse"></div>
+      <div v-for="i in 4" :key="i" class="h-20 rounded-2xl bg-white/80 border border-black/[0.04] animate-pulse"></div>
     </div>
 
     <!-- Empty state geral (lista vazia após busca bem-sucedida) -->
     <div
       v-else-if="searched && !changes.length && !loadingBase && !loadingCategory && !error"
-      class="rounded-xl border border-dashed border-gray-700 p-10 text-center"
+      class="card rounded-2xl border-dashed p-10 text-center"
       data-testid="empty-state"
     >
-      <svg class="mx-auto h-10 w-10 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <svg class="mx-auto h-10 w-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="11" cy="11" r="7" />
         <path d="M21 21l-4.3-4.3" stroke-linecap="round" />
       </svg>
-      <p class="mt-3 text-gray-300 font-semibold">
+      <p class="mt-3 text-ink font-semibold">
         {{ emptyNotice?.message || 'Nenhuma alteração encontrada neste período.' }}
       </p>
       <p class="text-sm text-gray-500 mt-1">
@@ -67,16 +65,14 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onActivated, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref } from 'vue'
 import { getUserChanges } from '../api/audits'
 import { useToast } from '../composables/useToast'
 import AuditSearchBar from '../components/AuditSearchBar.vue'
 import UserChangesList from '../components/UserChangesList.vue'
-import { datetimeLocalToIso, presetPeriodRange } from '../utils/datetimeLocal'
+import { datetimeLocalToIso } from '../utils/datetimeLocal'
 
 const { addToast } = useToast()
-const route = useRoute()
 
 const SERVICE_BY_CATEGORY = {
   queue: 'ContactCenter',
@@ -103,7 +99,6 @@ const defaultEmptyHint =
   'Amplie o intervalo de datas ou confira se a pessoa está correta. A pesquisa padrão só traz divisão — use “Buscar filas”, “Buscar roles” ou “Buscar grupos” para incluir essas categorias.'
 
 const searchBar = ref(null)
-const initialUser = ref(null)
 const changes = ref([])
 const meta = ref(null)
 const loadingBase = ref(false)
@@ -114,7 +109,6 @@ const fetchedDeepCategories = ref([])
 const truncatedByCategory = ref({})
 /** Última busca sem novos matches: { message, hint, category } | null */
 const emptyNotice = ref(null)
-let lastAutoUserId = null
 /** AbortController da busca em voo; seq invalida handlers após cancel/supersede. */
 let activeController = null
 let searchSeq = 0
@@ -203,8 +197,6 @@ function resetResults() {
 
 function onClear() {
   resetResults()
-  initialUser.value = null
-  lastAutoUserId = null
 }
 
 function mergeChanges(incoming) {
@@ -371,30 +363,4 @@ async function runDeepSearch({ user, start, end, category }) {
   }
 }
 
-function defaultPeriod() {
-  return presetPeriodRange('7d')
-}
-
-async function handleIncomingQuery() {
-  const qUserId = route.query.userId
-  if (!qUserId || qUserId === lastAutoUserId) return
-  lastAutoUserId = qUserId
-  const name = route.query.name || qUserId
-  initialUser.value = { id: qUserId, name, email: '' }
-  await nextTick()
-  const period = searchBar.value?.period || defaultPeriod()
-  await runBaseSearch({
-    user: { id: qUserId, name, email: '' },
-    start: period.start,
-    end: period.end,
-  })
-}
-
-onMounted(() => {
-  handleIncomingQuery()
-})
-
-onActivated(() => {
-  handleIncomingQuery()
-})
 </script>

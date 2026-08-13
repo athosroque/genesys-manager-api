@@ -4,6 +4,69 @@
 
 @layer base {
   body {
-    @apply bg-gray-950 text-gray-100;
+    @apply bg-canvas text-ink antialiased font-sans;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-brand hover:bg-brand-hover text-white text-sm font-semibold
+           rounded-full transition-colors shadow-sm
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-brand;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-white hover:bg-gray-50 text-ink text-sm font-semibold
+           rounded-full border border-gray-200 transition-colors
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-ice {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2
+           hover:bg-sky-100 text-ink text-sm font-semibold
+           rounded-full transition-colors
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400;
+    background-color: #E6F4F9;
+  }
+
+  .card {
+    @apply bg-white rounded-3xl border border-black/[0.04];
+    box-shadow: theme('boxShadow.card');
+  }
+
+  .input {
+    @apply w-full bg-white border border-gray-200 text-ink rounded-xl px-4 py-2.5 text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand
+           placeholder:text-gray-400 disabled:opacity-50 transition-all;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium
+           text-gray-700 hover:bg-white/70 transition-colors;
+  }
+
+  .sidebar-link-active {
+    @apply bg-brand text-white shadow-sm hover:bg-brand hover:text-white;
+  }
+
+  .sidebar-foot-link {
+    @apply flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm font-medium
+           text-gray-600 hover:bg-white/70 hover:text-ink transition-colors text-left;
+  }
+
+  .top-tab {
+    @apply relative inline-flex items-center h-16 px-1 text-sm font-medium text-gray-500
+           hover:text-ink transition-colors;
+  }
+
+  .top-tab-active {
+    @apply text-ink;
+  }
+
+  .top-tab-active::after {
+    content: '';
+    @apply absolute left-0 right-0 bottom-0 h-[3px] bg-brand rounded-t-full;
   }
 }

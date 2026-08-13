@@ -9,6 +9,12 @@ export const autocompleteUsers = (q) =>
 export const getUserQueues = (userId) =>
     request(`/users/${userId}/queues`)
 
+/** Presença (primaryPresence) do dia civil BR — Analytics User Status Detail. */
+export const getUserPresence = (userId, date) =>
+    request(
+        `/analytics/users/${encodeURIComponent(userId)}/presence?date=${encodeURIComponent(date)}`
+    )
+
 export const reactivateUser = (userId, version) =>
     request(`/users/${userId}/reactivate`, {
         method: 'POST',

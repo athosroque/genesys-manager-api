@@ -1,49 +1,49 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-950 p-6 selection:bg-blue-500/30">
-    
+  <div class="min-h-screen flex items-center justify-center p-6 bg-canvas selection:bg-brand/20">
+
     <!-- Card de Login -->
-    <div class="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl shadow-black/50">
-      
+    <div class="w-full max-w-md card rounded-3xl p-8 md:p-10">
+
       <!-- Cabeçalho -->
       <div class="text-center mb-10">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600/10 border border-blue-500/20 mb-4">
-          <span class="text-4xl">🔷</span>
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-soft mb-4">
+          <BrandMark class="w-9 h-9" />
         </div>
-        <h1 class="text-2xl font-bold text-white tracking-tight">Genesys Manager</h1>
-        <p class="text-sm text-gray-500 mt-1 font-mono">sae1.pure.cloud</p>
+        <h1 class="text-2xl font-bold text-ink tracking-tight">Genesys Manager</h1>
+        <p class="text-sm text-gray-400 mt-1">sae1.pure.cloud</p>
       </div>
 
       <!-- Auto-login do magic link (POST consome o token; GET só redireciona) -->
       <div v-if="autoLoggingIn" class="text-center space-y-4">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-600/10 border border-blue-500/20 mb-2">
-          <svg class="animate-spin h-7 w-7 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-brand-soft mb-2">
+          <svg class="animate-spin h-7 w-7 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
         </div>
-        <h2 class="text-lg font-semibold text-white">Entrando…</h2>
-        <p class="text-sm text-gray-400 leading-relaxed">
+        <h2 class="text-lg font-semibold text-ink">Entrando…</h2>
+        <p class="text-sm text-gray-500 leading-relaxed">
           Validando seu link de acesso. Aguarde um instante.
         </p>
       </div>
 
       <!-- Estado de sucesso: verifique seu e-mail -->
       <div v-else-if="sent" class="text-center space-y-4">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-600/10 border border-emerald-500/20 mb-2">
-          <svg class="w-7 h-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-green-50 border border-green-200 mb-2">
+          <svg class="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
-        <h2 class="text-lg font-semibold text-white">Verifique seu e-mail</h2>
-        <p class="text-sm text-gray-400 leading-relaxed">
+        <h2 class="text-lg font-semibold text-ink">Verifique seu e-mail</h2>
+        <p class="text-sm text-gray-500 leading-relaxed">
           Se o endereço for válido, enviamos um link de acesso para
-          <span class="text-gray-200 font-medium">{{ email }}</span>.
-          O link é válido por <span class="text-gray-200 font-medium">10 minutos</span>.
+          <span class="text-ink font-medium">{{ email }}</span>.
+          O link é válido por <span class="text-ink font-medium">10 minutos</span>.
         </p>
         <button
           type="button"
           @click="resetForm"
-          class="mt-4 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+          class="mt-4 text-sm text-brand hover:text-brand-hover transition-colors font-medium"
         >
           Usar outro e-mail
         </button>
@@ -52,7 +52,7 @@
       <!-- Formulário -->
       <form v-else @submit.prevent="handleSubmit" class="space-y-6">
         <div>
-          <label for="email" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">E-mail</label>
+          <label for="email" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">E-mail</label>
           <input
             id="email"
             v-model="email"
@@ -60,13 +60,13 @@
             required
             autocomplete="email"
             placeholder="seu.nome@claro.com.br"
-            class="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-gray-600"
+            class="input"
           />
-          <p class="mt-2 text-xs text-gray-500">Use um e-mail corporativo <span class="text-gray-400">@claro.com.br</span></p>
+          <p class="mt-2 text-xs text-gray-400">Use um e-mail corporativo <span class="text-gray-500">@claro.com.br</span></p>
         </div>
 
         <!-- Erro -->
-        <div v-if="error" class="bg-red-900/10 border border-red-900/30 rounded-lg p-3 flex items-center gap-2 text-sm text-red-400 animate-in fade-in slide-in-from-top-1">
+        <div v-if="error" class="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-sm text-red-700">
           <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -76,7 +76,7 @@
         <button
           type="submit"
           :disabled="loading"
-          class="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 group"
+          class="btn-primary w-full py-3.5 group"
         >
           <svg v-if="loading" class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -91,7 +91,7 @@
         </button>
       </form>
 
-      <div class="mt-8 pt-6 border-t border-gray-800 flex justify-center text-[10px] text-gray-600 uppercase tracking-widest font-bold">
+      <div class="mt-8 pt-6 border-t border-gray-100 flex justify-center text-[10px] text-gray-400 uppercase tracking-widest font-bold">
         Secure Access — Internal Use Only
       </div>
     </div>
@@ -104,6 +104,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { requestLoginLink, confirmMagicLink } from '../api/auth'
 import { useAuth } from '../composables/useAuth'
+import BrandMark from '../components/BrandMark.vue'
 
 const ALLOWED_DOMAIN = '@claro.com.br'
 const INVALID_LINK_MSG =

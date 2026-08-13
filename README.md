@@ -44,6 +44,7 @@ Originalmente um script manual no Google Colab, a gestão de usuários no Genesy
 - **Login passwordless** — magic link por e-mail `@claro.com.br` (Resend); sessão JWT em cookie HttpOnly com idle de 48h (sliding).
 - **Admin de usuários locais** — listar, cadastrar e excluir operadores da plataforma (`GET/POST/DELETE /auth/users*`); domínio sozinho não basta — o e-mail precisa existir em `users.json`.
 - **Consulta e migração de usuários** — busca por matrícula/e-mail/UUID, reativação de contas e migração completa (divisão + role + grupo) em um fluxo só.
+- **Status na plataforma (presença)** — na Consulta, após achar o usuário: totais e timeline de `primaryPresence` do dia civil BR (`America/Sao_Paulo`) via `GET /analytics/users/{id}/presence?date=YYYY-MM-DD` (proxy da Analytics User Status Detail). Exige scope OAuth `analytics:readonly` no client credentials (ver abaixo).
 - **Trilha de Auditoria** — alterações de uma pessoa no período: **Pesquisar** traz só divisão; botões separados buscam filas, roles ou grupos (merge na lista), via `POST /audits/user-changes` (`deep_categories`) e cards normalizados no frontend.
 
 ## 🔐 Autenticação (resumo)
@@ -185,6 +186,8 @@ Arquivo `backend/.env` (copie de `backend/.env.example`). **Não** coloque secre
 | `GENESYS_CLIENT_ID` | Client ID OAuth (Client Credentials) | `seu_client_id_aqui` |
 | `GENESYS_CLIENT_SECRET` | Secret OAuth | `seu_client_secret_aqui` |
 | `GENESYS_REGION` | Região da org Genesys | `sae1.pure.cloud` |
+
+**Scopes / permissões OAuth (Admin Genesys → Integrations → OAuth):** além dos já usados por users/queues/audits, a feature de presença precisa do scope **`analytics:readonly`** no mesmo client (`GENESYS_CLIENT_ID`), com role da integração autorizada a analytics user detail nas divisões (FGAC). Sem isso a API responde **403** (ou resultado vazio se faltar grant de divisão). Detalhes: [`docs/ANALYTICS-PRESENCA-CONSULTA.md`](docs/ANALYTICS-PRESENCA-CONSULTA.md).
 | `JWT_SECRET_KEY` | Assinatura dos JWTs locais | `openssl rand -hex 32` |
 | `JWT_EXPIRE_MINUTES` | Idle da sessão (sliding) | `2880` (48h) |
 | `ENVIRONMENT` | Flags de cookie (Secure / SameSite) | `development` / `production` |

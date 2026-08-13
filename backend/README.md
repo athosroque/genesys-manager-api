@@ -146,6 +146,14 @@ e `/auth/verify`.
 | :--- | :--- | :--- |
 | `/api/migration/run` | `POST` | Fluxo completo de migração (Divisão + Role + Grupo) num usuário |
 
+**Analytics** (`routes/analytics.py` + `services/user_presence.py`, prefixo `/analytics`) —
+proxy síncrono da User Status Detail query (presença). Scope OAuth:
+`analytics:readonly`.
+
+| Rota Interna | Método | Descrição | Endpoint Genesys Correspondente |
+| :--- | :--- | :--- | :--- |
+| `/api/analytics/users/{id}/presence` | `GET` | Presença (`primaryPresence`) do dia civil BR (`?date=YYYY-MM-DD`) | `POST /api/v2/analytics/users/details/query` |
+
 **Auditoria** (`routes/audits.py` + `services/user_audit.py`, prefixo `/audits`) —
 proxy assíncrono da Platform Audit API da Genesys e consolidação focada por
 usuário. A tela principal do frontend usa **`POST /audits/user-changes`**; as

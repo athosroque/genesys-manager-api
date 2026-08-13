@@ -4,6 +4,11 @@ const routes = [
     {
         path: '/',
         name: 'Home',
+        component: () => import('../views/DashboardView.vue')
+    },
+    {
+        path: '/consulta',
+        name: 'Consulta',
         component: () => import('../views/ConsultaView.vue')
     },
     {
