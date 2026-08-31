@@ -112,13 +112,14 @@ const INVALID_LINK_MSG =
 
 const route = useRoute()
 const router = useRouter()
-const { checkAuth } = useAuth()
+const { checkAuth, setUser } = useAuth()
 
 const email = ref('')
 const loading = ref(false)
 const error = ref('')
 const sent = ref(false)
 const autoLoggingIn = ref(false)
+let tokenProcessed = false
 
 function isAllowedEmail(value) {
   return value.trim().toLowerCase().endsWith(ALLOWED_DOMAIN)
@@ -131,15 +132,24 @@ function resetForm() {
 }
 
 async function completeMagicLinkLogin(token) {
+  if (!token || tokenProcessed || autoLoggingIn.value) {
+    return
+  }
+  tokenProcessed = true
   autoLoggingIn.value = true
   error.value = ''
 
   try {
-    await confirmMagicLink(token)
-    await checkAuth()
+    const res = await confirmMagicLink(token)
+    if (res?.user && typeof setUser === 'function') {
+      setUser(res.user)
+    } else {
+      await checkAuth()
+    }
     await router.replace({ name: 'Home' })
   } catch (err) {
     autoLoggingIn.value = false
+    tokenProcessed = false
     error.value =
       typeof err.message === 'string' && err.message
         ? err.message

@@ -23,6 +23,11 @@ export function useAuth() {
         }
     }
 
+    function setUser(userData) {
+        user.value = userData
+        loading.value = false
+    }
+
     async function logout() {
         try {
             await apiLogout()
@@ -39,6 +44,7 @@ export function useAuth() {
         isAuthenticated,
         loading,
         checkAuth,
+        setUser,
         logout
     }
 }

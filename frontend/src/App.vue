@@ -10,7 +10,13 @@
       <p class="text-sm text-gray-500 animate-pulse">Autenticando...</p>
     </div>
 
-    <template v-if="isAuthenticated">
+    <!-- Tela de Login (rota /login) -->
+    <main v-else-if="route.name === 'Login'">
+      <RouterView />
+    </main>
+
+    <!-- Shell autenticado (demais rotas) -->
+    <template v-else-if="isAuthenticated">
       <!-- Overlay mobile -->
       <div
         v-if="sidebarOpen"
@@ -196,10 +202,6 @@
       </div>
     </template>
 
-    <main v-else-if="!loading">
-      <RouterView />
-    </main>
-
     <ToastContainer />
   </div>
 </template>
@@ -238,7 +240,9 @@ watch(() => route.path, () => {
 })
 
 onMounted(async () => {
-  await checkAuth()
+  if (user.value === null && route.name !== 'Login') {
+    await checkAuth()
+  }
 })
 </script>
 

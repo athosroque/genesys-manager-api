@@ -40,7 +40,7 @@ router.beforeEach(async (to) => {
     const { user, isAuthenticated, checkAuth } = useAuth()
 
     // Se o user ainda não foi carregado (primeiro acesso)
-    if (user.value === null) {
+    if (user.value === null && to.name !== 'Login') {
         await checkAuth()
     }
 
@@ -49,8 +49,8 @@ router.beforeEach(async (to) => {
         return { name: 'Login' }
     }
 
-    // Se já estiver logado e for pro login, vai pra home
-    if (isAuthenticated.value && to.name === 'Login') {
+    // Se já estiver logado e for pro login sem token de novo acesso, vai pra home
+    if (isAuthenticated.value && to.name === 'Login' && !to.query.token) {
         return { name: 'Home' }
     }
 
