@@ -15,6 +15,11 @@ export const getUserPresence = (userId, date) =>
         `/analytics/users/${encodeURIComponent(userId)}/presence?date=${encodeURIComponent(date)}`
     )
 
+/** Diagnóstico completo de telefonia, ramal e telefone base (WebRTC / SIP). */
+export const getUserTelephony = (userId) =>
+    request(`/users/${encodeURIComponent(userId)}/telephony`)
+
+
 export const reactivateUser = (userId, version) =>
     request(`/users/${userId}/reactivate`, {
         method: 'POST',

@@ -45,6 +45,7 @@ Originalmente um script manual no Google Colab, a gestão de usuários no Genesy
 - **Admin de usuários locais** — listar, cadastrar e excluir operadores da plataforma (`GET/POST/DELETE /auth/users*`); domínio sozinho não basta — o e-mail precisa existir em `users.json`.
 - **Consulta e migração de usuários** — busca por matrícula/e-mail/UUID, reativação de contas e migração completa (divisão + role + grupo) em um fluxo só.
 - **Status na plataforma (presença)** — na Consulta, após achar o usuário: totais e timeline de `primaryPresence` do dia civil BR (`America/Sao_Paulo`) via `GET /analytics/users/{id}/presence?date=YYYY-MM-DD` (proxy da Analytics User Status Detail). Exige scope OAuth `analytics:readonly` no client credentials (ver abaixo).
+- **Diagnóstico de Telefonia e Ramal (WebRTC)** — verificação instantânea na aba Consulta dos 3 pilares da estação/softphone (estação atribuída, status `ASSOCIATED` e telefone base ativo com Site). Discrimina Cenário 1 (backend 100% OK / falha local de microfone/cache) vs Cenário 2 (inconsistência no Genesys Cloud) e inclui ação rápida para copiar o laudo técnico formatado para chamados.
 - **Trilha de Auditoria** — alterações de uma pessoa no período: **Pesquisar** traz só divisão; botões separados buscam filas, roles ou grupos (merge na lista), via `POST /audits/user-changes` (`deep_categories`) e cards normalizados no frontend.
 
 ## 🔐 Autenticação (resumo)

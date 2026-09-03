@@ -4,7 +4,19 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 from main import app
 
+from auth_local import get_current_user
+
 client = TestClient(app)
+
+def _fake_user_dep():
+    return {"username": "tester", "active": True}
+
+@pytest.fixture(autouse=True)
+def override_auth():
+    app.dependency_overrides[get_current_user] = _fake_user_dep
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+
 
 @pytest.mark.asyncio
 async def test_reactivate_user():

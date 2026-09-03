@@ -132,6 +132,9 @@
             </div>
           </div>
 
+          <!-- Diagnóstico de Telefonia e Ramal -->
+          <TelephonyPanel :user-id="user.id" />
+
           <PresencePanel :user-id="user.id" />
         </div>
       </div>
@@ -343,6 +346,7 @@
 import { ref, computed, onMounted } from 'vue'
 import SearchBar from '../components/SearchBar.vue'
 import UserCard from '../components/UserCard.vue'
+import TelephonyPanel from '../components/TelephonyPanel.vue'
 import PresencePanel from '../components/PresencePanel.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import BrandMark from '../components/BrandMark.vue'

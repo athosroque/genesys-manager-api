@@ -94,7 +94,24 @@ O frontend utiliza o padrão de **Composables** para encapsular lógica de negó
 
 ---
 
+## 📞 Módulo de Consulta e Diagnóstico de Telefonia
+
+`ConsultaView.vue` (rota `/consulta` — **Consulta e Ações**) é o ponto central para atendimento de suporte e gestão operacional de colaboradores:
+
+- **Busca Rápida**: por matrícula, e-mail institucional ou UUID.
+- **Card do Usuário (`UserCard.vue`)**: detalhes de perfil, cargo, departamento, divisão e roles.
+- **Filas do Usuário**: listagem dinâmica com opção de remoção individual.
+- **Telefonia e Ramal (`TelephonyPanel.vue`)**: diagnóstico instantâneo dos 3 pilares de telefonia WebRTC/SIP:
+  1. *Estação / Ramal*: identificador, tipo (`generic_sip`, `webrtc`) e status de atribuição.
+  2. *Conexão da Estação*: status em tempo real (`ASSOCIATED` com dot pulsante verde vs `DISASSOCIATED`).
+  3. *Telefone Base*: nome, estado ativo e Site vinculado.
+  - Botão **"Copiar Laudo"**: gera e copia para a área de transferência o laudo técnico estruturado (incluindo checklist de ações N1/N2) para abertura e atualização ágil de chamados (Jira/ServiceNow/Teams).
+- **Status na Plataforma (`PresencePanel.vue`)**: agregação e timeline visual da presença do dia (`America/Sao_Paulo`).
+
+---
+
 ## 🔎 Módulo de Auditoria
+
 
 `AuditView.vue` (rota `/auditoria` — **Trilha de Auditoria**) é o fluxo
 principal: selecionar **pessoa** + **período** e escolher o tipo de busca.

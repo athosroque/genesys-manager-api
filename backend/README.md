@@ -128,6 +128,8 @@ e `/auth/verify`.
 | `/api/users/{id}/reactivate` | `POST` | Reativa conta desativada | `/api/v2/users/{userId}` |
 | `/api/users/{id}/queues` | `GET` | Filas em que o usuário está | `/api/v2/users/{userId}/queues` |
 | `/api/users/{id}/name` | `GET` | Lookup leve `{found, id, name}` — alimenta o cache de nomes da timeline de auditoria | `/api/v2/users/{userId}` (sem `expand`) |
+| `/api/users/{id}/telephony` | `GET` | Diagnóstico completo de telefonia, ramal e telefone base (WebRTC / SIP), validando os 3 pilares de integridade | `/api/v2/users/{userId}?expand=station,telephony`<br>`/api/v2/stations/{stationId}`<br>`/api/v2/telephony/providers/edges/phones` |
+
 
 **Queues / Groups / Roles / Divisions**
 

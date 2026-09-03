@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from config import BASE_URL, DOMAIN
 from auth import get_token, h
 from auth_local import get_current_user
+from services.user_telephony import get_user_telephony_diagnosis
 
 router = APIRouter()
 
@@ -233,3 +234,18 @@ async def get_user_name(user_id: str, current_user: dict = Depends(get_current_u
 
         data = response.json()
         return {"found": True, "id": data.get("id", user_id), "name": data.get("name")}
+
+
+@router.get("/{user_id}/telephony")
+async def get_user_telephony(user_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Diagnóstico completo de telefonia, ramal e telefone base do usuário.
+    Avalia integridade para migração WebRTC (Cenário 1 vs Cenário 2).
+    """
+    user_id = user_id.strip("{}")
+    token = await get_token()
+    headers = h(token)
+
+    async with httpx.AsyncClient() as client:
+        return await get_user_telephony_diagnosis(user_id, client, headers)
+
