@@ -115,14 +115,14 @@ O frontend utiliza o padrão de **Composables** para encapsular lógica de negó
 
 `AuditView.vue` (rota `/auditoria` — **Trilha de Auditoria**) é o fluxo
 principal: selecionar **pessoa** + **período** e escolher o tipo de busca.
-Chama `POST /audits/user-changes` via `getUserChanges` em `api/audits.js` e
-renderiza ChangeCards normalizados pelo backend.
+Chama `POST /audits/user-changes/stream` (SSE) via `streamUserChanges` em `api/audits.js` e
+renderiza o progresso de busca em tempo real e ChangeCards normalizados pelo backend.
 
 Fluxo da UI:
 
 1. **Pessoa** — autocomplete (nome) ou resolução por e-mail/UUID
    (`AuditSearchBar.vue`)
-2. **Período** — presets 24h / 7 dias / 30 dias ou `datetime-local`
+2. **Período** — presets 24h / 7 dias / 30 dias ou `datetime-local` (limitado a um intervalo máximo de 48h para buscas profundas para garantir performance e evitar timeouts)
 3. **Como funciona** — bloco na barra explicando o que cada botão retorna
    (divisão vs filas / roles / grupos) e por que deep é mais lento
 4. **Pesquisar** — só **divisão** (`deep_categories: []`); substitui a lista
@@ -148,8 +148,8 @@ Componentes do fluxo atual:
 | `views/AuditView.vue` | Orquestra busca base/deep, merge, cancelamento, empty por categoria e truncamento |
 | `components/AuditSearchBar.vue` | Pessoa + período + “Como funciona” + Pesquisar + botões deep + Cancelar |
 | `components/UserChangesList.vue` | Lista de ChangeCards + aviso de truncamento por categoria |
-| `api/audits.js` | `getUserChanges(body, options)` — aceita `deep_categories` e `signal` (abort) |
-| `api/http.js` | Em **504** / **408**, mensagem amigável de timeout (sugerindo intervalo menor na deep) |
+| `api/audits.js` | `streamUserChanges(body, callbacks)` — gerencia a conexão SSE (Server-Sent Events) passando callbacks para `onProgress`, `onComplete` e `onError`, e enviando sinal de aborto. |
+| `api/http.js` | Além de HTTP genérico, lida com EventSource (SSE), tratamento para `AbortError` local e timeouts de rede/QUIC (`net::ERR_QUIC_PROTOCOL_ERROR`) fechando graciosamente streams interrompidos. |
 
 Fluxos antigos da UI (toggle único de “busca profunda”, abas por filtros
 dinâmicos, multi-serviço “o que fez / o que fizeram com ela”, timeline bruta)

@@ -158,18 +158,19 @@ proxy síncrono da User Status Detail query (presença). Scope OAuth:
 
 **Auditoria** (`routes/audits.py` + `services/user_audit.py`, prefixo `/audits`) —
 proxy assíncrono da Platform Audit API da Genesys e consolidação focada por
-usuário. A tela principal do frontend usa **`POST /audits/user-changes`**; as
-rotas `/search` e `/search/deep` permanecem como API de baixo nível.
+usuário. A tela principal do frontend usa a rota SSE **`POST /audits/user-changes/stream`**; as
+rotas `/search` e `/search/deep` e o antigo `/user-changes` síncrono permanecem como API de baixo nível.
 
 | Rota Interna | Método | Descrição |
 | :--- | :--- | :--- |
-| `/api/audits/user-changes` | `POST` | **Fluxo principal:** alterações de um usuário no intervalo (ChangeCards). Default: só divisão (Directory). Deep por categoria via `deep_categories` (`queue` / `role` / `group`) |
+| `/api/audits/user-changes/stream` | `POST` | **Fluxo principal:** streaming via Server-Sent Events (SSE) do progresso e resultado das alterações de um usuário no intervalo (ChangeCards). Default: só divisão (Directory). Deep por categoria via `deep_categories` (`queue` / `role` / `group`) |
+| `/api/audits/user-changes` | `POST` | **Endpoint Antigo (Síncrono):** equivalente ao stream, mas mantendo a conexão bloqueada (propício a timeouts no proxy). |
 | `/api/audits/services` | `GET` | Árvore serviço → entidade → ação auditável na org |
 | `/api/audits/search` | `POST` | Cria a consulta, aguarda concluir, devolve a 1ª página |
 | `/api/audits/search/deep` | `POST` | Varredura multi-página filtrando por UUID no backend (API genérica; o fluxo por pessoa usa a lógica equivalente em `user_audit`) |
 | `/api/audits/search/{tid}/results` | `GET` | Próximas páginas via cursor |
 
-### `POST /audits/user-changes` — contrato
+### `POST /audits/user-changes/stream` — contrato
 
 **Request** (`UserChangesRequest`):
 
@@ -193,7 +194,7 @@ Mapeamento categoria → serviço Genesys: `queue` → ContactCenter (`Queue`), 
 
 **Limites** (em `services/user_audit.py`):
 
-- Intervalo máximo: **30 dias** (limite da Platform Audit API)
+- Intervalo máximo: **30 dias** para busca base (limite da Platform Audit API) e **48 horas** em modo Deep para garantir estabilidade.
 - Deep: `pageSize` **250**, no máximo **10 páginas** por janela (~2.500 eventos/janela)
 - Deep parte o intervalo em **janelas diárias** (`DEEP_CHUNK_DAYS = 1`); se uma janela truncar, **bisecta** até ~1h (`DEEP_MIN_CHUNK_SECONDS`). Pause `0.4s` entre chunks
 - `meta.truncated` / `meta.truncated_by_service` só ficam true se alguma janela ainda estourar o teto após a bisecção
