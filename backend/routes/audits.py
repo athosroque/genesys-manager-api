@@ -28,7 +28,7 @@ from typing import Any, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from auth import get_token, h
 from auth_local import get_current_user
@@ -118,7 +118,7 @@ class AuditDeepSearchRequest(AuditSearchRequest):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-async def _create_and_poll(payload: dict) -> tuple[str, str]:
+async def _create_and_poll(payload: dict, on_poll: Optional[Any] = None) -> tuple[str, str]:
     """Cria a consulta assíncrona e faz polling até Succeeded/Failed/Cancelled."""
     created = await genesys_request("POST", "/audits/query", json=payload)
     transaction_id = created.get("id")
@@ -126,7 +126,10 @@ async def _create_and_poll(payload: dict) -> tuple[str, str]:
         raise HTTPException(502, "Genesys não retornou o id da transação.")
 
     state = created.get("state", "Queued")
-    for _ in range(15):
+    if on_poll:
+        await on_poll(state, 1, 15, transaction_id)
+
+    for attempt in range(1, 16):
         if state == "Succeeded":
             break
         if state in ("Failed", "Cancelled"):
@@ -134,6 +137,8 @@ async def _create_and_poll(payload: dict) -> tuple[str, str]:
         await asyncio.sleep(2)
         status = await genesys_request("GET", f"/audits/query/{transaction_id}")
         state = status.get("state", state)
+        if on_poll:
+            await on_poll(state, min(attempt + 1, 15), 15, transaction_id)
     return transaction_id, state
 
 
@@ -256,6 +261,24 @@ def _event_matches(event: dict, match_value: str) -> bool:
         haystacks.extend(str(v) for v in (pc.get("oldValues") or []))
         haystacks.extend(str(v) for v in (pc.get("newValues") or []))
     return any(needle in h.lower() for h in haystacks if h)
+
+
+def _event_matches_multi(event: dict, match_values: set[str]) -> bool:
+    """
+    Versão multi-usuário de _event_matches: confere se algum dos UUIDs
+    em match_values está presente no evento.
+    """
+    if not match_values:
+        return False
+    needles = {m.lower() for m in match_values if m}
+    entity = event.get("entity") or {}
+    haystacks = [str(entity.get("name") or ""), str(entity.get("id") or "")]
+    for pc in event.get("propertyChanges") or []:
+        haystacks.append(str(pc.get("property") or ""))
+        haystacks.extend(str(v) for v in (pc.get("oldValues") or []))
+        haystacks.extend(str(v) for v in (pc.get("newValues") or []))
+    haystack_text = " ".join(h.lower() for h in haystacks if h)
+    return any(needle in haystack_text for needle in needles)
 
 
 # ---------------------------------------------------------------------------
@@ -387,7 +410,8 @@ async def deep_search_audits(
 
 
 class UserChangesRequest(BaseModel):
-    user: str = Field(..., min_length=1, description="E-mail ou UUID do usuário")
+    user: Optional[str] = Field(default=None, description="E-mail ou UUID do usuário (para busca individual)")
+    users: Optional[list[str]] = Field(default=None, description="Lista de e-mails ou UUIDs (até 10 usuários)")
     interval_start: str = Field(..., description="ISO 8601, ex: 2026-07-01T00:00:00Z")
     interval_end: str = Field(..., description="ISO 8601, ex: 2026-08-03T23:59:59Z")
     deep_categories: list[str] = Field(
@@ -406,22 +430,25 @@ class UserChangesRequest(BaseModel):
         ),
     )
 
+    @model_validator(mode="after")
+    def validate_user_or_users(self):
+        has_user = bool(self.user and self.user.strip())
+        has_users = bool(self.users and any(u and u.strip() for u in self.users))
+        if not has_user and not has_users:
+            raise ValueError("Informe 'user' ou 'users'")
+        return self
+
 
 @router.post("/user-changes")
 async def user_changes(
     body: UserChangesRequest, current_user: dict = Depends(get_current_user)
 ) -> dict:
     """
-    Consolida alterações relevantes de um usuário no intervalo (máx. 30 dias).
-
-    Sem deep_categories: só Directory/User (divisão).
-    Com deep_categories: deep só nas categorias pedidas.
-    Compat deep_search=true: Directory + queue/role/group.
+    Consolida alterações relevantes no intervalo (máx. 30 dias).
+    Aceita 'user' (individual) ou 'users' (até 10 pessoas).
     """
     from services.user_audit import get_user_changes
 
-    # Compat: deep_search=true sem categorias → None (resolve usa as 3 + Directory).
-    # Lista explícita (mesmo com deep_search) tem precedência e não inclui Directory.
     categories_arg: Optional[list[str]]
     if body.deep_categories:
         categories_arg = body.deep_categories
@@ -430,12 +457,69 @@ async def user_changes(
     else:
         categories_arg = []
 
+    user_refs = [u.strip() for u in (body.users or []) if u and u.strip()]
+    if not user_refs and body.user:
+        user_refs = [body.user.strip()]
+
     return await get_user_changes(
-        body.user,
+        user_refs,
         body.interval_start,
         body.interval_end,
         deep_search=body.deep_search,
         deep_categories=categories_arg,
+    )
+
+
+@router.post("/user-changes/stream")
+async def stream_user_changes_route(
+    body: UserChangesRequest, current_user: dict = Depends(get_current_user)
+):
+    """
+    Varredura profunda com progresso em tempo real via Server-Sent Events (SSE).
+    Suporta um ou múltiplos usuários (até 10).
+    """
+    import json
+    from fastapi.responses import StreamingResponse
+    from services.user_audit import stream_user_changes
+
+    categories_arg: Optional[list[str]]
+    if body.deep_categories:
+        categories_arg = body.deep_categories
+    elif body.deep_search:
+        categories_arg = None
+    else:
+        categories_arg = []
+
+    user_refs = [u.strip() for u in (body.users or []) if u and u.strip()]
+    if not user_refs and body.user:
+        user_refs = [body.user.strip()]
+
+    async def event_generator():
+        try:
+            async for ev in stream_user_changes(
+                user_refs,
+                body.interval_start,
+                body.interval_end,
+                deep_search=body.deep_search,
+                deep_categories=categories_arg,
+            ):
+                if ev.get("type") == "ping":
+                    # Comentário SSE W3C: mantém conexões HTTP/2 e HTTP/3 (QUIC) ativas no Cloudflare/proxies
+                    yield ": keep-alive\n\n"
+                else:
+                    yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+        except Exception as exc:
+            err_data = {"type": "error", "message": str(exc)}
+            yield f"data: {json.dumps(err_data, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

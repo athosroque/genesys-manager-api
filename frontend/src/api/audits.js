@@ -1,4 +1,4 @@
-import { request } from './http'
+import { request, streamRequest } from './http'
 
 export const getAuditServices = () => request('/audits/services')
 
@@ -21,12 +21,23 @@ export const deepSearchAudits = (body) =>
 
 /**
  * Alterações focadas em um usuário no intervalo.
- * Body: { user, interval_start, interval_end, deep_categories?: string[], deep_search?: bool }
+ * Body: { user?, users?, interval_start, interval_end, deep_categories?: string[], deep_search?: bool }
  * deep_categories: 'queue' | 'role' | 'group' (default []). Compat: deep_search true = as 3.
  */
 export const getUserChanges = (body, options = {}) =>
     request('/audits/user-changes', {
         method: 'POST',
         body: JSON.stringify(body),
+        ...options,
+    })
+
+/**
+ * Varredura profunda com streaming SSE de progresso e resultado.
+ */
+export const streamUserChanges = (body, onEvent, options = {}) =>
+    streamRequest('/audits/user-changes/stream', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        onEvent,
         ...options,
     })

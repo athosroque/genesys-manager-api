@@ -47,6 +47,10 @@ export function presetPeriodRange(presetId) {
     const start = new Date(end.getTime() - 24 * 3600 * 1000)
     return { start: toDatetimeLocalValue(start), end: toDatetimeLocalValue(end) }
   }
+  if (presetId === '48h') {
+    const start = new Date(end.getTime() - 48 * 3600 * 1000)
+    return { start: toDatetimeLocalValue(start), end: toDatetimeLocalValue(end) }
+  }
   const days = presetId === '30d' ? 30 : 7
   const start = new Date(
     end.getFullYear(),

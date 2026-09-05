@@ -1,5 +1,21 @@
 <template>
   <div class="space-y-4">
+    <!-- Filtro por Pessoa (se múltiplos usuários) -->
+    <div v-if="userChips.length > 1" class="flex flex-wrap items-center gap-2 pb-1 border-b border-gray-100">
+      <span class="text-xs text-gray-400 font-medium mr-1">Pessoa:</span>
+      <button
+        v-for="chip in userChips"
+        :key="chip.id"
+        type="button"
+        class="category-chip"
+        :class="userFilter === chip.id ? 'chip-on' : 'chip-off'"
+        @click="userFilter = chip.id"
+      >
+        {{ chip.label }}
+        <span v-if="chip.count != null" class="opacity-60">{{ chip.count }}</span>
+      </button>
+    </div>
+
     <!-- Chips de categoria -->
     <div class="flex flex-wrap items-center gap-2">
       <button
@@ -57,6 +73,12 @@
             >
               {{ categoryLabel(card.category) }}
             </span>
+            <span
+              v-if="card.target_user?.name || card.target_user?.email"
+              class="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 border border-gray-200 mt-0.5"
+            >
+              👤 {{ card.target_user.name || card.target_user.email }}
+            </span>
             <p class="text-sm text-ink leading-snug break-words">
               {{ narrativeSentence(card) }}
             </p>
@@ -72,6 +94,12 @@
                 :class="categoryBadgeClass(card.category)"
               >
                 {{ categoryLabel(card.category) }}
+              </span>
+              <span
+                v-if="card.target_user?.name || card.target_user?.email"
+                class="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 border border-gray-200"
+              >
+                👤 {{ card.target_user.name || card.target_user.email }}
               </span>
               <div class="min-w-0">
                 <p class="text-sm font-semibold text-ink truncate">
@@ -111,7 +139,7 @@
       v-else
       class="rounded-2xl border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-400"
     >
-      Nenhuma alteração nesta categoria — escolha “Todas” ou outro filtro.
+      Nenhuma alteração encontrada para os filtros selecionados.
     </div>
   </div>
 </template>
@@ -129,6 +157,8 @@ const props = defineProps({
    * Controla quais chips de fila/role/grupo ficam visíveis além da divisão.
    */
   fetchedDeepCategories: { type: Array, default: () => [] },
+  /** Lista de usuários consultados no lote: [{ id, name, email }] */
+  queriedUsers: { type: Array, default: () => [] },
 })
 
 const CATEGORY_ORDER = ['group', 'role', 'division', 'queue']
@@ -170,13 +200,41 @@ const NARRATIVE_PREFIX = {
 }
 
 const categoryFilter = ref('all')
+const userFilter = ref('all')
 
 watch(
   () => props.changes,
   () => {
     categoryFilter.value = 'all'
+    userFilter.value = 'all'
   },
 )
+
+const userChips = computed(() => {
+  const usersMap = new Map()
+  for (const u of props.queriedUsers || []) {
+    if (u?.id) {
+      usersMap.set(u.id, { id: u.id, label: u.name || u.email || u.id, count: 0 })
+    }
+  }
+  for (const c of props.changes) {
+    const tu = c?.target_user
+    if (tu?.id) {
+      if (!usersMap.has(tu.id)) {
+        usersMap.set(tu.id, { id: tu.id, label: tu.name || tu.email || tu.id, count: 0 })
+      }
+      usersMap.get(tu.id).count++
+    }
+  }
+
+  const list = [...usersMap.values()]
+  if (list.length <= 1) return []
+
+  return [
+    { id: 'all', label: 'Todas as pessoas', count: props.changes.length },
+    ...list,
+  ]
+})
 
 const countsByCategory = computed(() => {
   const counts = { group: 0, role: 0, division: 0, queue: 0 }
@@ -234,6 +292,9 @@ const filtered = computed(() => {
   if (categoryFilter.value !== 'all') {
     list = list.filter((c) => c.category === categoryFilter.value)
   }
+  if (userFilter.value !== 'all') {
+    list = list.filter((c) => c?.target_user?.id === userFilter.value)
+  }
   return [...list].sort((a, b) => (b.event_date || '').localeCompare(a.event_date || ''))
 })
 
@@ -267,6 +328,9 @@ function narrativeSentence(card) {
   const resource = card.resource?.name || card.resource?.id || '—'
   const who = changedByLabel(card.changed_by)
   const when = formatEventDate(card.event_date)
+  if (card.target_user?.name && (props.queriedUsers?.length > 1 || userChips.value.length > 1)) {
+    return `${prefix} ${resource} para ${card.target_user.name} por ${who} em ${when}`
+  }
   return `${prefix} ${resource} por ${who} em ${when}`
 }
 

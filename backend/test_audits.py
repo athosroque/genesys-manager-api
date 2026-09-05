@@ -127,3 +127,93 @@ def test_user_changes_rejects_interval_over_30_days():
         assert "30" in str(detail)
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_event_matches_multi():
+    from routes.audits import _event_matches_multi
+
+    u1 = "11111111-1111-1111-1111-111111111111"
+    u2 = "22222222-2222-2222-2222-222222222222"
+    u3 = "33333333-3333-3333-3333-333333333333"
+
+    queue_event = {
+        "serviceName": "ContactCenter",
+        "entityType": "Queue",
+        "propertyChanges": [{"property": f"QueueMember/queue-id-1:{u1}"}],
+    }
+    role_event = {
+        "serviceName": "PeoplePermissions",
+        "entityType": "Role",
+        "entity": {"name": f"{u2}--role-id-1--org-id"},
+    }
+    group_event = {
+        "serviceName": "Groups",
+        "entityType": "DirectoryGroup",
+        "propertyChanges": [
+            {"property": "group-membership", "newValues": [u1, u3]}
+        ],
+    }
+    unrelated_event = {
+        "serviceName": "ContactCenter",
+        "entityType": "Queue",
+        "propertyChanges": [{"property": "QueueMember/queue-id-1:99999999-9999-9999-9999-999999999999"}],
+    }
+
+    user_set = {u1, u2}
+    assert _event_matches_multi(queue_event, user_set) is True
+    assert _event_matches_multi(role_event, user_set) is True
+    assert _event_matches_multi(group_event, user_set) is True
+    assert _event_matches_multi(unrelated_event, user_set) is False
+    assert _event_matches_multi(queue_event, set()) is False
+
+
+def test_user_changes_validation_rejects_empty_users():
+    app.dependency_overrides[get_current_user] = _fake_user
+    try:
+        client = TestClient(app)
+        # Nem user nem users
+        response = client.post(
+            "/audits/user-changes",
+            json={
+                "interval_start": "2026-07-01T00:00:00Z",
+                "interval_end": "2026-07-07T00:00:00Z",
+            },
+        )
+        assert response.status_code == 422
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.mark.asyncio
+async def test_user_changes_stream_endpoint():
+    app.dependency_overrides[get_current_user] = _fake_user
+    try:
+        async def fake_stream(*args, **kwargs):
+            yield {"type": "init", "users": [{"id": "u1", "name": "User 1"}], "total_chunks": 2}
+            yield {"type": "ping"}
+            yield {"type": "progress", "category": "queue", "service": "ContactCenter", "chunk": 1, "total_chunks": 2, "scanned": 100, "matched": 1}
+            yield {"type": "done", "users": [{"id": "u1", "name": "User 1"}], "changes": [], "meta": {"scanned_total": 100, "matched_total": 1}}
+
+        with patch("services.user_audit.stream_user_changes", side_effect=fake_stream):
+            client = TestClient(app)
+            response = client.post(
+                "/audits/user-changes/stream",
+                json={
+                    "users": ["u1@example.com", "u2@example.com"],
+                    "interval_start": "2026-07-01T00:00:00Z",
+                    "interval_end": "2026-07-07T00:00:00Z",
+                    "deep_categories": ["queue"],
+                },
+            )
+            assert response.status_code == 200
+            assert "text/event-stream" in response.headers["content-type"]
+            assert response.headers.get("x-accel-buffering") == "no"
+            assert "no-transform" in response.headers.get("cache-control", "")
+            assert ": keep-alive\n\n" in response.text
+            assert "data: " in response.text
+            assert '"type": "init"' in response.text
+            assert '"type": "progress"' in response.text
+            assert '"type": "done"' in response.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+

@@ -64,9 +64,18 @@ def test_validate_interval_rejects_inverted():
 
 def test_validate_interval_rejects_over_30_days():
     with pytest.raises(HTTPException) as exc:
-        validate_interval("2026-07-01T00:00:00Z", "2026-08-01T00:00:01Z")
+        validate_interval("2026-07-01T00:00:00Z", "2026-08-01T00:01:01Z")
     assert exc.value.status_code == 422
     assert str(MAX_INTERVAL_DAYS) in exc.value.detail
+
+
+def test_validate_interval_deep_rejects_over_48_hours():
+    with pytest.raises(HTTPException) as exc:
+        validate_interval(
+            "2026-07-01T00:00:00Z", "2026-07-03T00:05:00Z", max_hours=48
+        )
+    assert exc.value.status_code == 422
+    assert "48" in exc.value.detail
 
 
 # ---------------------------------------------------------------------------
@@ -485,12 +494,12 @@ async def test_get_user_changes_deep_search_compat_runs_all(monkeypatch):
     monkeypatch.setattr("services.user_audit.resolve_user", fake_resolve)
     monkeypatch.setattr("services.user_audit.fetch_name_maps", fake_maps)
     monkeypatch.setattr("services.user_audit._paginated_audit", fake_paginated)
-    monkeypatch.setattr("services.user_audit._deep_audit_chunked", fake_deep)
+    monkeypatch.setattr("services.user_audit._deep_audit_window", fake_deep)
 
     result = await get_user_changes(
         "f@ex.com",
         "2026-07-01T00:00:00Z",
-        "2026-07-07T00:00:00Z",
+        "2026-07-02T00:00:00Z",
         deep_search=True,
     )
     assert result["meta"]["deep_search"] is True
@@ -526,12 +535,12 @@ async def test_get_user_changes_deep_categories_queue_only(monkeypatch):
     monkeypatch.setattr("services.user_audit.resolve_user", fake_resolve)
     monkeypatch.setattr("services.user_audit.fetch_name_maps", fake_maps)
     monkeypatch.setattr("services.user_audit._paginated_audit", fake_paginated)
-    monkeypatch.setattr("services.user_audit._deep_audit_chunked", fake_deep)
+    monkeypatch.setattr("services.user_audit._deep_audit_window", fake_deep)
 
     result = await get_user_changes(
         "f@ex.com",
         "2026-07-01T00:00:00Z",
-        "2026-07-07T00:00:00Z",
+        "2026-07-02T00:00:00Z",
         deep_categories=["queue"],
     )
     assert result["meta"]["deep_categories"] == ["queue"]
@@ -545,6 +554,20 @@ async def test_get_user_changes_deep_categories_queue_only(monkeypatch):
     )
     assert result["meta"]["truncated"] is True
     assert result["meta"]["truncated_by_service"]["ContactCenter"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_user_changes_deep_rejects_over_48_hours():
+    """Deep search rejeita intervalos maiores que 48 horas."""
+    with pytest.raises(HTTPException) as exc:
+        await get_user_changes(
+            "f@ex.com",
+            "2026-07-01T00:00:00Z",
+            "2026-07-04T00:00:00Z",
+            deep_categories=["queue"],
+        )
+    assert exc.value.status_code == 422
+    assert "48" in exc.value.detail
 
 
 @pytest.mark.asyncio
