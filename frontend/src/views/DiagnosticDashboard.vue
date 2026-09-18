@@ -29,7 +29,9 @@
         
         <QualityCard :details="interactionData.details" :calls="interactionData.calls" />
         
-        <RawDataDrawer :details="interactionData.details" :calls="interactionData.calls" />
+        <AdvancedAuditPanel :conversationId="currentConversationId" />
+        
+        <RawDataDrawer :details="interactionData.details" />
       </div>
 
     </div>
@@ -44,11 +46,13 @@ import ExecutiveHeader from '../components/ExecutiveHeader.vue';
 import AuditOriginBanner from '../components/AuditOriginBanner.vue';
 import InteractionTimeline from '../components/InteractionTimeline.vue';
 import QualityCard from '../components/QualityCard.vue';
+import AdvancedAuditPanel from '../components/AdvancedAuditPanel.vue';
 import RawDataDrawer from '../components/RawDataDrawer.vue';
 
 const isLoading = ref(false);
 const errorMsg = ref('');
 const interactionData = ref(null);
+const currentConversationId = ref('');
 
 const hasData = computed(() => interactionData.value && interactionData.value.details);
 
@@ -56,6 +60,7 @@ const fetchInteractionData = async (conversationId) => {
   isLoading.value = true;
   errorMsg.value = '';
   interactionData.value = null;
+  currentConversationId.value = conversationId;
 
   try {
     const data = await request(`/diagnostics/${conversationId}`);

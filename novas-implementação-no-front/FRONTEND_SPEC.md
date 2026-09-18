@@ -1,6 +1,6 @@
 # Especificação de Frontend: Dashboard de Diagnóstico de Interações Genesys Cloud
 
-Este documento define a especificação completa de telas, componentes visuais, métricas e mapeamento de dados (a partir dos arquivos `_details.json` e `_calls.json`) para a criação do frontend de debug e auditoria de atendimentos.
+Este documento define a especificação completa de telas, componentes visuais, métricas e mapeamento de dados (a partir dos arquivos `_details.json` e `Auditoria Avançada`) para a criação do frontend de debug e auditoria de atendimentos.
 
 ---
 
@@ -40,7 +40,6 @@ Card superior com resumo instantâneo da chamada/mensagem:
 | **Duração Total** | Ex: `47m 30s` (calculado entre início e fim) | `details.json` | `conversationStart` e `conversationEnd` |
 | **Data e Hora Início** | Data/Hora formatada em horário local (ex: `08/09/2026 13:12:00`) | `details.json` | `conversationStart` |
 | **Status Desconexão** | Badge colorido com o tipo (ex: `Cliente Desligou`, `Transferido`, `Erro Sistema`) | `details.json` | Último `segments[].disconnectType` e `disconnectReason` |
-| **Gravação & Pausa** | Ícone de gravação (`Gravada` / `Não Gravada`) + Alerta de Pausa Segura | `calls.json` | `recordingState` (`active`/`none`) e `securePause` (`true`/`false`) |
 
 ---
 
@@ -137,10 +136,6 @@ Exibido para chamadas de **Voz**, crucial para investigar quedas, mudo unilatera
 | **Métricas R-Factor** | `details.json` | `sessions[].mediaEndpointStats[].minRFactor` | Float (ex: `92.5`) |
 | **Latência Máxima** | `details.json` | `sessions[].mediaEndpointStats[].maxLatencyMs` | Inteiro em milissegundos |
 | **Pacotes Descartados** | `details.json` | `sessions[].mediaEndpointStats[].discardedPackets` | Inteiro (alerta se > 0) |
-| **Provedor de Telefonia**| `calls.json` | `participants[].provider` | Ex: `"Edge"` |
-| **Proxy SIP Regional** | `calls.json` | `participants[].address` | URI SIP contendo `edge-proxy.sae1...` |
-| **Gravação da Chamada** | `calls.json` | `recordingState` | `"active"`, `"none"`, `"paused"` |
-| **Pausa Segura** | `calls.json` | `securePause` | Booleano (`true` / `false`) |
 
 ---
 
@@ -214,8 +209,8 @@ Exibido para chamadas de **Voz**, crucial para investigar quedas, mudo unilatera
 
 ## 🎯 Resumo das Regras de Negócio para os Desenvolvedores Frontend
 
-1. **Sempre verificar se existe `calls.json`:**
-   * Se for interação de **Mensagem/WhatsApp**, o arquivo `calls.json` pode não ter gravações ou ser resumido. O frontend deve tratar graciosamente chamadas de voz vs texto.
+1. **Tratamento de tipos de mídia:**
+   * Se for interação de **Mensagem/WhatsApp**, alguns campos de telefonia não existirão. O frontend deve tratar graciosamente chamadas de voz vs texto.
 2. **Cálculo de Holds:**
    * O frontend deve filtrar todos os `segments` onde `segmentType == "hold"` dentro da perna do cliente ou do operador para somar o tempo total e a quantidade de pausas.
 3. **Detecção de Transferência Cega vs Consulta:**

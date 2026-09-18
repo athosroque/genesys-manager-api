@@ -192,6 +192,16 @@ async def get_user_queues(user_id: str, current_user: dict = Depends(get_current
         url = f"{BASE_URL}/users/{user_id}/queues"
         response = await client.get(url, headers=headers)
         
+        if response.status_code == 403:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Integração Genesys sem permissão para listar filas de usuário (403 Forbidden). "
+                    "Verifique se o OAuth Client (GENESYS_CLIENT_ID) possui a permissão 'routing:queue:view' "
+                    "na role atribuída às divisões necessárias no Genesys Cloud."
+                ),
+            )
+
         if response.status_code >= 400:
             raise HTTPException(status_code=response.status_code, detail=f"Erro ao buscar filas Genesys: {response.text}")
             

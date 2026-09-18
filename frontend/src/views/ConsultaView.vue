@@ -63,9 +63,10 @@
                 <div class="min-w-0">
                   <h3 class="text-sm font-semibold text-ink">
                     Filas Configuradas na Plataforma
-                    (<span :class="queues.length > 0 ? 'text-brand' : 'text-gray-400'">{{ queues.length }}</span>)
+                    (<span :class="queuesError ? 'text-amber-600 font-bold' : (queues.length > 0 ? 'text-brand' : 'text-gray-400')">{{ queuesError ? '!' : queues.length }}</span>)
                   </h3>
                   <p v-if="queuesLoading" class="text-xs text-brand mt-0.5 animate-pulse">Carregando filas do back-end...</p>
+                  <p v-else-if="queuesError" class="text-xs text-amber-600 mt-0.5 font-medium">Erro de permissão/acesso ao buscar filas</p>
                   <p v-else class="text-xs text-gray-400 mt-0.5">Gestão individual de participações</p>
                 </div>
               </div>
@@ -119,6 +120,27 @@
                     </tbody>
                   </table>
                 </div>
+              </div>
+              <div
+                v-else-if="queuesError"
+                class="mx-5 mb-5 mt-1 rounded-2xl border border-amber-200 bg-amber-50/70 p-6 text-center text-amber-800 text-sm flex flex-col items-center gap-2"
+              >
+                <div class="flex items-center gap-2 text-amber-800 font-semibold">
+                  <svg class="w-5 h-5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  Falha ao consultar filas do usuário
+                </div>
+                <p class="text-xs text-amber-700 max-w-lg break-words">{{ queuesError }}</p>
+                <button
+                  @click="fetchQueues(user.id)"
+                  class="mt-2 text-xs font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Tentar novamente
+                </button>
               </div>
               <div
                 v-else-if="!queuesLoading"
@@ -373,6 +395,7 @@ const searchError  = ref('')
 const user         = ref(null)
 const queues       = ref([])
 const queuesLoading = ref(false)
+const queuesError   = ref(null)
 
 // ─── Modais e loading das ações ───────────────────────────────────────────
 const actionLoading          = ref(false)
@@ -419,6 +442,7 @@ async function handleSearch(q, { soft = false } = {}) {
   lastQuery.value   = q
   searched.value    = true
   searchError.value = ''
+  queuesError.value = null
   if (!soft) {
     foundUser.value = false
     user.value = null
@@ -449,10 +473,12 @@ async function handleSearch(q, { soft = false } = {}) {
 
 async function fetchQueues(userId) {
   queuesLoading.value = true
+  queuesError.value = null
   try {
     const data = await getUserQueues(userId)
     queues.value = data.queues || []
   } catch (err) {
+    queuesError.value = err.message
     addToast('Erro ao buscar filas: ' + err.message, 'error')
   } finally {
     queuesLoading.value = false

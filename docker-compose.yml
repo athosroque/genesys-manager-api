@@ -1,6 +1,20 @@
 version: "3.9"
 
 services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-genesys_manager}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - genesys-net
+    ports:
+      - "5432:5432"
+
   backend:
     build: 
       context: ./backend
@@ -21,8 +35,11 @@ services:
     volumes:
       - ./backend/users.json:/app/users.json
       - ./backend/auth_tokens.json:/app/auth_tokens.json
+      - ./backend/tickets_enriched.db:/app/tickets_enriched.db
     expose:
       - "8000"
+    depends_on:
+      - db
     networks:
       - genesys-net
 
@@ -41,3 +58,6 @@ networks:
   genesys-net:
     name: genesys-net
     driver: bridge
+
+volumes:
+  postgres_data:

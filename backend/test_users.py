@@ -88,6 +88,21 @@ async def test_get_user_queues_sanitization():
 
 
 @pytest.mark.asyncio
+async def test_get_user_queues_403_informative():
+    with patch("routes.users.get_token", new_callable=AsyncMock) as mock_token:
+        mock_token.return_value = "fake_token"
+        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+            mock_response = MagicMock()
+            mock_response.status_code = 403
+            mock_response.text = '{"message":"forbidden"}'
+            mock_get.return_value = mock_response
+
+            response = client.get("/users/some-user-uuid/queues")
+            assert response.status_code == 403
+            assert "routing:queue:view" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_get_user_name_success():
     with patch("routes.users.get_token", new_callable=AsyncMock) as mock_token:
         mock_token.return_value = "fake_token"

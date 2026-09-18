@@ -9,9 +9,10 @@
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![Vue.js](https://img.shields.io/badge/Vue.js-3-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=flat-square&logo=postgresql&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Container-2496ED?style=flat-square&logo=docker&logoColor=white)
-![Cloudflare](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=flat-square&logo=cloudflare&logoColor=white)
+![Cloudflare](https://img.shields.io/badge/Cloudflare-Zero%20Trust-F38020?style=flat-square&logo=cloudflare&logoColor=white)
 
 ---
 
@@ -32,6 +33,8 @@
 - **🚀 Frontend:** [Vue 3 App](frontend/)
 - **⚙️ Backend:** [FastAPI Core](backend/)
 - **🔐 Auth local:** [Magic link + JWT](backend/auth_local.py) · [Rotas](backend/routes/auth_routes.py)
+- **📊 Tickets & FAQ:** [Gestão de Chamados e Base de Conhecimento](frontend/src/views/TicketsView.vue)
+- **🔄 Pipeline ETL Zero Trust:** [Guia de Sincronização](docs/SINCRONIZACAO_SQLITE_POSTGRES.md) · [Instruções para Origem](INSTRUCOES_ORIGEM_SYNC.md)
 
 ---
 
@@ -46,8 +49,11 @@ Originalmente um script manual no Google Colab, a gestão de usuários no Genesy
 - **Consulta e migração de usuários** — busca por matrícula/e-mail/UUID, reativação de contas e migração completa (divisão + role + grupo) em um fluxo só.
 - **Status na plataforma (presença)** — na Consulta, após achar o usuário: totais e timeline de `primaryPresence` do dia civil BR (`America/Sao_Paulo`) via `GET /analytics/users/{id}/presence?date=YYYY-MM-DD` (proxy da Analytics User Status Detail). Exige scope OAuth `analytics:readonly` no client credentials (ver abaixo).
 - **Diagnóstico de Telefonia e Ramal (WebRTC)** — verificação instantânea na aba Consulta dos 3 pilares da estação/softphone (estação atribuída, status `ASSOCIATED` e telefone base ativo com Site). Discrimina Cenário 1 (backend 100% OK / falha local de microfone/cache) vs Cenário 2 (inconsistência no Genesys Cloud) e inclui ação rápida para copiar o laudo técnico formatado para chamados.
-- **Dashboard de Diagnóstico de Interações** — interface focada na auditoria e análise técnica de chamadas e interações usando um `conversationId`. Inclui identificação imediata sobre origem do atendimento (transferência humana ou bot/URA), métricas da chamada, trilha temporal visual (Timeline), diagnóstico WebRTC/Borda AWS e acesso aos payloads JSON puros, auxiliando rapidamente na resolução de chamados técnicos relatados por operadores.
+- **Dashboard de Diagnóstico de Interações** — interface focada na auditoria e análise técnica de chamadas e interações usando um `conversationId`. Inclui identificação imediata sobre origem do atendimento (transferência humana ou bot/URA), métricas da chamada, trilha temporal visual (Timeline), diagnóstico WebRTC/Borda AWS e extração dos detalhes consolidados, auxiliando rapidamente na resolução de chamados técnicos relatados por operadores.
+- **Auditoria Avançada (API Orchestration / BFF)** — extração e consolidação em tempo real do ecossistema de uma interação com apenas 1 clique. Ao informar um `conversationId`, o backend age como orquestrador buscando simultaneamente: regras de Timeout e ACW da Fila, Wrapup Codes mapeados, Assistente/Copilot configurado na fila, Permissões efetivas do Agente e Políticas de Client Apps (iFrames), gerando um JSON técnico unificado para detecção imediata de causa raiz.
 - **Trilha de Auditoria** — alterações de uma pessoa no período (limitado a 48h para buscas profundas para garantir estabilidade): **Pesquisar** traz só divisão; botões separados buscam filas, roles ou grupos (merge na lista), via streaming SSE em tempo real (`POST /audits/user-changes/stream`) com progresso granular e cards normalizados no frontend.
+- **Gestão de Tickets & Base de Conhecimento (FAQ)** — visualização e acompanhamento de chamados técnicos enriquecidos, curadoria humana de classificações e identificação de perguntas frequentes (FAQ) com métricas agregadas.
+- **Pipeline ETL SQLite ➔ PostgreSQL via Cloudflare Zero Trust** — sincronização contínua a cada 10s de chamados originados em base legada SQLite remota através de túnel seguro TCP (`postgres.projetoathos.com.br`) sem expor portas públicas na internet, com suporte a Watermark e UPSERT idempotente.
 
 ## 🔐 Autenticação (resumo)
 
@@ -84,31 +90,36 @@ Detalhes e riscos residuais: [backend/README.md](backend/README.md#segurança).
 | Tecnologia | Função | Vantagem |
 | :--- | :--- | :--- |
 | **Python / FastAPI** | API Backend | Performante, assíncrona e tipagem forte. |
+| **PostgreSQL 15** | Banco de Dados Relacional | Persistência confiável de tickets enriquecidos e FAQ. |
 | **Vue 3 / Vite** | Dashboard Frontend | Interface reativa e rápida com Composition API. |
 | **Tailwind CSS 3** | Design System | Estilização moderna e layout responsivo. |
-| **Docker Compose** | Infraestrutura | Reprodutibilidade total do ambiente produtivo. |
+| **Cloudflare Zero Trust** | Conectividade & Segurança | Túneis mTLS e transporte TCP seguro sem portas abertas. |
+| **Docker Compose** | Infraestrutura | Reprodutibilidade total do ambiente produtivo (stack com 3 containers). |
 
 ## 📁 Estrutura do Projeto
 
 | Pasta / arquivo | Para que serve |
 | :--- | :--- |
-| `backend/` | API FastAPI: auth magic link, proxy Genesys, auditoria, migração |
-| `frontend/` | SPA Vue 3 (login, consulta/migração, trilha de auditoria, admin) |
+| `backend/` | API FastAPI, ORM PostgreSQL, worker ETL, proxy Genesys |
+| `frontend/` | SPA Vue 3 (login, consulta/migração, trilha de auditoria, tickets, admin) |
+| `docs/` | Guias técnicos (`SINCRONIZACAO_SQLITE_POSTGRES.md`, WebRTC, etc.) |
+| `INSTRUCOES_ORIGEM_SYNC.md` | Guia completo com credenciais para execução na máquina de origem SQLite |
 | `refencia_retornos/` | Material de referência da Audit API (dicionário, âncora, amostras locais) |
 | `docs/arquivo/` | Código/UI histórica fora do runtime (ex.: CLI de senha, UI antiga de auditoria) |
 | `reports/figures/` | Banner e assets visuais do README / portfólio |
 | `portfolio.html` | Página estática de apresentação do projeto |
-| `docker-compose.yml` | Stack local: backend + frontend (nginx na porta **8082**) |
-| `.gitignore` | Ignora `.env`, `users.json`, `auth_tokens.json`, amostras com PII, etc. |
+| `docker-compose.yml` | Stack local: db (Postgres 15) + backend + frontend (nginx na porta **8082**) |
+| `.gitignore` | Ignora `.env`, credenciais Cloudflare, `users.json`, `auth_tokens.json`, etc. |
 
 ```text
-├── backend/                 # Runtime da API
-├── frontend/                # Runtime da SPA
-├── refencia_retornos/       # Referência Audit API (não é serviço)
-├── docs/arquivo/            # Histórico / legado (não entra no Docker)
-├── reports/figures/         # Assets visuais
-├── portfolio.html           # Landing de portfólio
-└── docker-compose.yml
+├── backend/                    # Runtime da API e Worker ETL
+├── frontend/                   # Runtime da SPA
+├── docs/                       # Documentação técnica e guias de infra
+├── INSTRUCOES_ORIGEM_SYNC.md   # Guia pronto para envio à máquina SQLite
+├── refencia_retornos/          # Referência Audit API (não é serviço)
+├── reports/figures/            # Assets visuais
+├── portfolio.html              # Landing de portfólio
+└── docker-compose.yml          # Orquestração (Frontend + Backend + PostgreSQL)
 ```
 
 ## 🛠️ Pré-requisitos
@@ -187,7 +198,10 @@ Arquivo `backend/.env` (copie de `backend/.env.example`). **Não** coloque secre
 | `GENESYS_CLIENT_SECRET` | Secret OAuth | `seu_client_secret_aqui` |
 | `GENESYS_REGION` | Região da org Genesys | `sae1.pure.cloud` |
 
-**Scopes / permissões OAuth (Admin Genesys → Integrations → OAuth):** além dos já usados por users/queues/audits, a feature de presença precisa do scope **`analytics:readonly`** no mesmo client (`GENESYS_CLIENT_ID`), com role da integração autorizada a analytics user detail nas divisões (FGAC). Sem isso a API responde **403** (ou resultado vazio se faltar grant de divisão). Detalhes: [`docs/ANALYTICS-PRESENCA-CONSULTA.md`](docs/ANALYTICS-PRESENCA-CONSULTA.md). Para a feature de Diagnóstico de Interações, são necessários os scopes adicionais `analytics:conversationDetail:view` e `telephony:providers:view`.
+**Scopes / permissões OAuth (Admin Genesys → Integrations → OAuth):**
+- **Filas (`/api/users/{id}/queues`, `/api/queues`):** requer permissão **`routing:queue:view`** na Role atribuída ao OAuth Client (e escopo `routing` / `routing:readonly`). Para remoção de filas (`/api/queues/...`), requer **`routing:queue:edit`** / **`routing:queueMember:manage`**. A Role deve estar vinculada às divisões correspondentes (ou `*` - Todas as Divisões).
+- **Presença / Analytics:** requer o scope **`analytics:readonly`** no mesmo client (`GENESYS_CLIENT_ID`), com role da integração autorizada a analytics user detail nas divisões (FGAC). Sem isso a API responde **403** (ou resultado vazio se faltar grant de divisão). Detalhes: [`docs/ANALYTICS-PRESENCA-CONSULTA.md`](docs/ANALYTICS-PRESENCA-CONSULTA.md).
+- **Diagnóstico de Interações e Telefonia:** são necessários os scopes e permissões adicionais `analytics:conversationDetail:view`, `telephony:providers:view`, `telephony:station:view` e `telephony:phone:view`.
 | `JWT_SECRET_KEY` | Assinatura dos JWTs locais | `openssl rand -hex 32` |
 | `JWT_EXPIRE_MINUTES` | Idle da sessão (sliding) | `2880` (48h) |
 | `ENVIRONMENT` | Flags de cookie (Secure / SameSite) | `development` / `production` |
@@ -198,8 +212,12 @@ Arquivo `backend/.env` (copie de `backend/.env.example`). **Não** coloque secre
 | `APP_BASE_URL` | Base pública (link do e-mail + redirect) | `https://genesys.projetoathos.com.br` — definida só no `.env` (o Compose **não** sobrescreve). Para testar magic links só em localhost, altere temporariamente no `backend/.env`; não bakeie localhost no `docker-compose.yml` se a stack também servir o domínio público. |
 | `ALLOWED_EMAIL_DOMAIN` | Domínio aceito no login/cadastro | `claro.com.br` |
 | `MAGIC_LINK_EXPIRE_MINUTES` | TTL do magic link | `10` |
+| `DATABASE_URL` | String de conexão com o PostgreSQL | `postgresql://postgres:postgres@db:5432/genesys_manager` |
+| `CLOUDFLARE_API_TOKEN` | Token da API Cloudflare (Tunnels/Access) | `cfut_xxxxxxxxx` |
+| `CLOUDFLARE_ACCOUNT_ID` | ID da conta Cloudflare Zero Trust | `8254abaf6f...` |
+| `CLOUDFLARE_ZONE_ID` | ID da zona DNS na Cloudflare | `cf71e2c7ce...` |
 
-Arquivos sensíveis **gitignored**: `.env`, `backend/users.json`, `backend/auth_tokens.json`.
+Arquivos sensíveis **gitignored**: `.env`, `backend/users.json`, `backend/auth_tokens.json`, `backend/.cloudflare_service_token.json`.
 
 ---
 **Desenvolvido por Athos** - [LinkedIn](https://www.linkedin.com/in/athosroque) | [GitHub](https://github.com/athosroque)

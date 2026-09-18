@@ -369,8 +369,8 @@ async def _paginated_audit(
                 "stage": "page_analyzed",
                 "message": f"Página {page_num + 1} concluída: {len(batch)} eventos lidos ({match_msg}).",
                 "page": page_num + 1,
-                "scanned": scanned,
-                "matched": len(matched),
+                "scanned_delta": len(batch),
+                "matched_delta": len(page_matches),
             })
 
         cursor = page.get("cursor")
@@ -966,8 +966,8 @@ async def stream_user_changes(
             any_truncated = False
             errors: list[str] = []
 
-            cumulative_scanned = 0
-            cumulative_matched = 0
+            dynamic_scanned = 0
+            dynamic_matched = 0
 
             # 1. Se incluir Directory (somente usuário individual):
             if include_directory:
@@ -999,6 +999,23 @@ async def stream_user_changes(
                         on_step=_dir_step,
                     )
                     all_events.extend(d_entities)
+                    
+                    # Converter Directory events para cards e emitir
+                    dir_cards = []
+                    for ev in d_entities:
+                        cards = to_change_cards_multi(ev, maps, user_map)
+                        dir_cards.extend(cards)
+                        
+                    await _emit({
+                        "type": "progress",
+                        "category": "division",
+                        "service": "Directory",
+                        "scanned": dynamic_scanned,
+                        "matched": dynamic_matched,
+                        "changes": dir_cards,
+                        "message": "Consulta de divisão concluída.",
+                    })
+                    
                     scanned_by_service["Directory"] = {
                         "scanned": d_scanned,
                         "matched": len(d_entities),
@@ -1035,6 +1052,11 @@ async def stream_user_changes(
                         await asyncio.sleep(DEEP_CHUNK_PAUSE_SECONDS)
 
                     async def _step_handler(s: dict):
+                        nonlocal dynamic_scanned, dynamic_matched
+                        if s.get("stage") == "page_analyzed":
+                            dynamic_scanned += s.get("scanned_delta", 0)
+                            dynamic_matched += s.get("matched_delta", 0)
+
                         await _emit({
                             "type": "step",
                             "category": cat_name,
@@ -1043,8 +1065,8 @@ async def stream_user_changes(
                             "total_chunks": total_chunks,
                             "start": chunk_start,
                             "end": chunk_end,
-                            "scanned": cumulative_scanned + s.get("scanned", 0),
-                            "matched": cumulative_matched + s.get("matched", 0),
+                            "scanned": dynamic_scanned,
+                            "matched": dynamic_matched,
                             "stage": s.get("stage", ""),
                             "message": s.get("message", ""),
                         })
@@ -1058,12 +1080,17 @@ async def stream_user_changes(
                             match_values=user_ids,
                             on_step=_step_handler,
                         )
+                        if cat_name == DEEP_CATEGORY_GROUP and matched:
+                            await _resolve_group_membership_directions(matched, chunk_start, chunk_end)
+
                         svc_matched_events.extend(matched)
                         svc_scanned_count += scanned
-                        cumulative_scanned += scanned
-                        cumulative_matched += len(matched)
-                        if truncated:
-                            svc_truncated = True
+
+                        # Converter para cards e emitir
+                        chunk_cards = []
+                        for ev in matched:
+                            cards = to_change_cards_multi(ev, maps, user_map)
+                            chunk_cards.extend(cards)
 
                         await _emit({
                             "type": "progress",
@@ -1073,8 +1100,9 @@ async def stream_user_changes(
                             "total_chunks": total_chunks,
                             "start": chunk_start,
                             "end": chunk_end,
-                            "scanned": cumulative_scanned,
-                            "matched": cumulative_matched,
+                            "scanned": dynamic_scanned,
+                            "matched": dynamic_matched,
+                            "changes": chunk_cards,
                             "message": f"Janela {current_chunk_counter} de {total_chunks} concluída ({service_name}).",
                         })
                     except Exception as exc:
@@ -1087,20 +1115,13 @@ async def stream_user_changes(
                             "total_chunks": total_chunks,
                             "start": chunk_start,
                             "end": chunk_end,
-                            "scanned": cumulative_scanned,
-                            "matched": cumulative_matched,
+                            "scanned": dynamic_scanned,
+                            "matched": dynamic_matched,
                             "error": str(exc),
                         })
 
-                if cat_name == DEEP_CATEGORY_GROUP and svc_matched_events:
-                    await _emit({
-                        "type": "step",
-                        "stage": "resolving_group_directions",
-                        "message": "Identificando adições/remoções de membresia em grupos...",
-                    })
-                    await _resolve_group_membership_directions(
-                        svc_matched_events, interval_start, interval_end
-                    )
+                        if svc_truncated:
+                            any_truncated = True
 
                 all_events.extend(svc_matched_events)
                 scanned_by_service[service_name] = {
@@ -1155,8 +1176,7 @@ async def stream_user_changes(
                 "include_directory": include_directory,
                 "truncated": any_truncated,
                 "truncated_by_service": truncated_by_service,
-                "scanned_by_service": scanned_by_service,
-                "scanned_total": cumulative_scanned + (scanned_by_service.get("Directory", {}).get("scanned", 0) if include_directory else 0),
+                "scanned_total": dynamic_scanned,
                 "matched_total": len(changes),
             }
             if errors:

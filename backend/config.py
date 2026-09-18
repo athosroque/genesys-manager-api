@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     ALLOWED_EMAIL_DOMAIN: str = os.getenv("ALLOWED_EMAIL_DOMAIN", "claro.com.br")
     MAGIC_LINK_EXPIRE_MINUTES: int = int(os.getenv("MAGIC_LINK_EXPIRE_MINUTES", 10))
 
+    # Cloudflare
+    CLOUDFLARE_API_TOKEN: str = os.getenv("CLOUDFLARE_API_TOKEN", "")
+    CLOUDFLARE_ACCOUNT_ID: str = os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
+    CLOUDFLARE_ZONE_ID: str = os.getenv("CLOUDFLARE_ZONE_ID", "")
+
+    # PostgreSQL Database
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/genesys_manager")
+
     @property
     def cookie_max_age(self) -> int:
         """Idade máxima do cookie em segundos (espelha JWT_EXPIRE_MINUTES)."""

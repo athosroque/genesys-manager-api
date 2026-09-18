@@ -28,6 +28,11 @@ async def list_queues(current_user: dict = Depends(get_current_user)) -> dict:
             url = f"{BASE_URL}/routing/queues?pageSize={PAGE_SIZE}&pageNumber={page_number}"
             response = await client.get(url, headers=headers)
 
+            if response.status_code == 403:
+                return {
+                    "queues": [],
+                    "warning": "sem permissão routing:queue:view",
+                }
             if response.status_code >= 400:
                 # Não quebra a busca: devolve o que já coletou + aviso.
                 return {
@@ -66,6 +71,14 @@ async def delete_user_from_all_queues(user_id: str, current_user: dict = Depends
         url_search = f"{BASE_URL}/users/{user_id}/queues"
         response_search = await client.get(url_search, headers=headers)
         
+        if response_search.status_code == 403:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Integração sem permissão para consultar filas do usuário (403 Forbidden). "
+                    "Requer permissão 'routing:queue:view' na role do OAuth Client."
+                ),
+            )
         if response_search.status_code >= 400:
             raise HTTPException(status_code=response_search.status_code, detail=f"Erro ao buscar filas Genesys: {response_search.text}")
             

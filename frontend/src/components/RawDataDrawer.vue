@@ -17,23 +17,20 @@
     <div v-show="isOpen" class="p-0 border-t border-slate-200 bg-slate-900">
       <div class="flex border-b border-slate-700 bg-slate-800">
         <button 
-          class="px-4 py-2 text-sm font-medium focus:outline-none"
-          :class="activeTab === 'details' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-400 hover:text-slate-200'"
-          @click="activeTab = 'details'"
+          class="px-4 py-2 text-sm font-medium focus:outline-none text-blue-400 border-b-2 border-blue-400"
         >
           _details.json
         </button>
-        <button 
-          class="px-4 py-2 text-sm font-medium focus:outline-none"
-          :class="activeTab === 'calls' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-400 hover:text-slate-200'"
-          @click="activeTab = 'calls'"
-        >
-          _calls.json
-        </button>
-        <div class="ml-auto p-2">
+        <div class="ml-auto p-2 flex gap-2">
+           <button 
+             @click="downloadJson"
+             class="bg-slate-600 hover:bg-slate-500 text-white text-xs px-3 py-1 rounded transition-colors"
+           >
+             Download JSON
+           </button>
            <button 
              @click="copyJson"
-             class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded"
+             class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded transition-colors"
            >
              Copiar JSON
            </button>
@@ -53,23 +50,28 @@ const props = defineProps({
   details: {
     type: Object,
     default: () => ({})
-  },
-  calls: {
-    type: Object,
-    default: () => ({})
   }
 });
 
 const isOpen = ref(false);
-const activeTab = ref('details');
 
 const formattedJson = computed(() => {
-  const data = activeTab.value === 'details' ? props.details : props.calls;
-  return JSON.stringify(data, null, 2);
+  return JSON.stringify(props.details, null, 2);
 });
 
 const copyJson = () => {
   navigator.clipboard.writeText(formattedJson.value);
+};
+
+const downloadJson = () => {
+  const blob = new Blob([formattedJson.value], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const conversationId = props.details.conversationId || 'interacao';
+  a.download = `details_${conversationId}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 };
 </script>
 

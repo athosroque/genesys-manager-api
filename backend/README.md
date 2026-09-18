@@ -7,8 +7,10 @@ O backend do Genesys Manager é uma API assíncrona construída em **Python 3.11
 ## 🛠️ Stack Tecnológica
 
 - **FastAPI**: Framework web moderno, de alto desempenho e com suporte nativo a `async/await`.
+- **SQLAlchemy & PostgreSQL**: ORM e banco de dados relacional para persistência de tickets e base de conhecimento.
+- **Psycopg2**: Driver PostgreSQL de alta performance para operações relacionais e pipeline ETL.
 - **Pydantic Settings**: Gestão de variáveis de ambiente e validação de configurações.
-- **Httpx**: Cliente HTTP assíncrono para integração com a API da Genesys.
+- **Httpx**: Cliente HTTP assíncrono para integração com a API da Genesys e Cloudflare.
 - **Python-jose**: Gerenciamento de tokens JWT (assinatura e validação).
 - **Passlib (Bcrypt)**: Ainda usado só para popular o campo legado `hashed_password`
   em `users.json` no cadastro admin — **login não usa senha** (magic link).
@@ -245,22 +247,77 @@ Detalhes de comportamento por serviço da Audit API (formatos de UUID
 embutidos em `propertyChanges`, quirks confirmados por serviço, etc.) ficam
 em [`refencia_retornos/DICIONARIO-AUDITORIA.md`](../refencia_retornos/DICIONARIO-AUDITORIA.md).
 
+**Tickets & Base de Conhecimento** (`routes/tickets.py`, prefixo `/tickets`) —
+Gestão de chamados técnicos enriquecidos, curadoria de classificação e agregação de métricas para a Base de Conhecimento (FAQ).
+
+| Rota Interna | Método | Descrição |
+| :--- | :--- | :--- |
+| `/api/tickets/` | `GET` | Lista tickets enriquecidos com suporte a paginação (`limit`, `offset`) e filtro por `status` |
+| `/api/tickets/knowledge-base` | `GET` | Métricas agregadas (total de tickets, categorizados como FAQ) e distribuição por categoria |
+| `/api/tickets/{external_id}` | `GET` | Detalhes completos de um ticket por ID externo |
+| `/api/tickets/{external_id}` | `PUT` | Permite operadores revisarem/atualizarem classificação e status de FAQ |
+| `/api/tickets/sync` | `POST` | Disparo manual de sincronização/carga |
+
+---
+
+## 🐘 Banco de Dados PostgreSQL & Pipeline ETL
+
+O backend utiliza o **PostgreSQL 15** para armazenamento persistente de tickets e conhecimento acumulado.
+
+- **ORM & Models:** Estrutura gerenciada via **SQLAlchemy** em `models.py` (`Ticket`, `Base`) com engine e sessões em `database.py`.
+- **Pipeline Incremental SQLite ➔ PostgreSQL:**
+  - O script [`etl_sync_sqlite_to_postgres.py`](etl_sync_sqlite_to_postgres.py) atua como worker contínuo (loop de 10s).
+  - Executa na máquina de origem (onde reside o SQLite legado), conectando-se ao PostgreSQL via túnel seguro Cloudflare Zero Trust (`postgres.projetoathos.com.br`).
+  - Utiliza controle de **Watermark** (`MAX(id)` e `MAX(updated_at)`) e **UPSERT** (`ON CONFLICT (external_id) DO UPDATE`) para garantir idempotência e sincronização de modificações.
+- **Documentação Operacional:**
+  - Guia de arquitetura e infraestrutura: [`docs/SINCRONIZACAO_SQLITE_POSTGRES.md`](../docs/SINCRONIZACAO_SQLITE_POSTGRES.md)
+  - Guia pronto para envio à máquina de origem: [`INSTRUCOES_ORIGEM_SYNC.md`](../INSTRUCOES_ORIGEM_SYNC.md)
+
+---
+
+## ☁️ Integração Cloudflare (Zero Trust)
+
+O backend possui um client integrado em `services/cloudflare_service.py` configurado para interagir com a API v4 da Cloudflare. Ele gerencia as configurações sem expor credenciais ao frontend. Atualmente suporta:
+- Verificação de validade de Tokens
+- Listagem e detalhes de Túneis Zero Trust (`cfd_tunnel`)
+- Leitura de registros DNS
+
+As chaves ficam isoladas no backend, exigindo no `.env`:
+`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_ZONE_ID`.
+
 ---
 
 ## 📁 Estrutura de Diretórios
 
 ```text
-├── routes/             # Definição modular de rotas (APIRouter)
-├── services/           # Orquestração de domínio (ex.: user_audit.py)
-├── auth.py             # OAuth2 Client Credentials Genesys
-├── auth_local.py       # JWT, cookie, RBAC local (sem login por senha)
-├── email_service.py    # Envio de magic link (Resend)
-├── token_store.py      # Tokens magic link (hash em auth_tokens.json)
-├── config.py           # Settings / env
-├── main.py             # Entrada e middlewares
-├── .env.example        # Placeholders (sem secrets reais)
-├── users.json          # Usuários locais (gitignored)
-└── auth_tokens.json    # Hashes de magic link (gitignored)
+├── routes/                         # Definição modular de rotas (APIRouter)
+│   ├── auth_routes.py              # Login magic link e gestão de usuários
+│   ├── users.py                    # Busca, autocomplete e diagnóstico de telefonia
+│   ├── queues.py                   # Gestão de filas, grupos e divisões
+│   ├── audits.py                   # Proxy SSE e histórico de auditoria
+│   ├── analytics.py                # Presença de operadores
+│   ├── migration.py                # Fluxo automatizado de migração
+│   └── tickets.py                  # Endpoints de tickets e FAQ
+├── services/                       # Orquestração de domínio (auditoria, presença, etc.)
+│   ├── user_audit.py               # Motor da trilha de auditoria SSE
+│   ├── user_presence.py            # Consulta de presença e timeline
+│   ├── db_tickets.py               # Camada de acesso a dados (PostgreSQL)
+│   └── cloudflare_service.py       # Client da API Cloudflare Zero Trust
+├── models.py                       # Modelos ORM SQLAlchemy (Ticket)
+├── database.py                     # Configuração de Engine e Session do PostgreSQL
+├── etl_sync_sqlite_to_postgres.py  # Worker contínuo de sincronização (10s)
+├── migrate_sqlite_to_postgres.py   # Script de carga única local SQLite -> Postgres
+├── auth.py                         # OAuth2 Client Credentials Genesys
+├── auth_local.py                   # JWT, cookie, RBAC local (sem login por senha)
+├── email_service.py                # Envio de magic link (Resend)
+├── token_store.py                  # Tokens magic link (hash em auth_tokens.json)
+├── config.py                       # Settings / env (Pydantic)
+├── main.py                         # Entrada e middlewares FastAPI
+├── requirements.txt                # Dependências da aplicação
+├── requirements-etl.txt            # Dependências do worker ETL
+├── .env.example                    # Placeholders de variáveis de ambiente
+├── users.json                      # Usuários locais (gitignored)
+└── auth_tokens.json                # Hashes de magic link (gitignored)
 ```
 
 CLI histórica de hash de senha: [`docs/arquivo/create_user.py`](../docs/arquivo/create_user.py)
@@ -271,7 +328,7 @@ CLI histórica de hash de senha: [`docs/arquivo/create_user.py`](../docs/arquivo
 ## 🚀 Como Rodar Localmente (Desenvolvimento)
 
 Stack completa via Compose na raiz: `docker-compose up -d --build`
-(frontend em `http://localhost:8082`). Só o backend:
+(frontend em `http://localhost:8082`, postgres na porta `5432`). Só o backend:
 
 1.  **Crie um ambiente virtual:**
     ```bash
@@ -287,7 +344,7 @@ Stack completa via Compose na raiz: `docker-compose up -d --build`
 3.  **Configure o `.env`:**
     ```bash
     cp .env.example .env
-    # Preencha JWT_SECRET_KEY, GENESYS_*, RESEND_*, APP_BASE_URL
+    # Preencha JWT_SECRET_KEY, GENESYS_*, RESEND_*, APP_BASE_URL, CLOUDFLARE_*, DATABASE_URL
     ```
 
 4.  **Inicie o servidor:**
@@ -300,3 +357,4 @@ Stack completa via Compose na raiz: `docker-compose up -d --build`
 
 **Camada de Segurança:** Rotas autenticadas exigem JWT no cookie (exceto
 `/auth/login` e `/auth/verify`). Gestão de usuários locais exige `role: admin`.
+

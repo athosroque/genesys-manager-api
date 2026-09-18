@@ -432,6 +432,8 @@ async function runDeepSearch({ user, users, start, end, category }) {
     steps: [],
   }
 
+  let totalNewMatches = 0
+
   try {
     const interval_start = datetimeLocalToIso(start)
     const interval_end = datetimeLocalToIso(end)
@@ -506,6 +508,10 @@ async function runDeepSearch({ user, users, start, end, category }) {
               const d = new Date(ev.start)
               progressState.value.dateLabel = d.toLocaleDateString('pt-BR')
             }
+            if (ev.changes && ev.changes.length > 0) {
+              totalNewMatches += countNewCategoryMatches(ev.changes, category)
+              mergeChanges(ev.changes)
+            }
             progressState.value.steps.push({
               time: now,
               message: ev.message || `Janela ${chunk} de ${total} concluída.`,
@@ -520,7 +526,7 @@ async function runDeepSearch({ user, users, start, end, category }) {
     if (isStale(seq)) return
     const incoming = data?.changes || []
     const hadOtherResults = changes.value.length > 0
-    const newMatches = countNewCategoryMatches(incoming, category)
+    totalNewMatches += countNewCategoryMatches(incoming, category)
     mergeChanges(incoming)
     meta.value = data?.meta || null
     markFetchedDeep([category])
@@ -531,7 +537,7 @@ async function runDeepSearch({ user, users, start, end, category }) {
         'warning',
       )
     }
-    if (newMatches === 0) {
+    if (totalNewMatches === 0) {
       setEmptyNotice(category)
       // Com lista já preenchida: toast + banner. Lista vazia: só empty state.
       if (hadOtherResults) {

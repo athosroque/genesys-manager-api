@@ -18,6 +18,8 @@ dist-ssr/
 docker-compose.override.yml
 backend/users.json
 backend/auth_tokens.json
+backend/.cloudflare*
+
 
 # Claude Code — permissões/config local, não faz sentido versionar num repo público
 .claude/

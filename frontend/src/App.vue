@@ -92,6 +92,18 @@
           </RouterLink>
 
           <RouterLink
+            to="/tickets"
+            class="sidebar-link"
+            :class="{ 'sidebar-link-active': isActive('/tickets') }"
+            @click="sidebarOpen = false"
+          >
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+            </svg>
+            Smart Tickets
+          </RouterLink>
+
+          <RouterLink
             v-if="isAdmin"
             to="/admin/usuarios"
             class="sidebar-link"
@@ -180,6 +192,13 @@
               Diagnóstico
             </RouterLink>
             <RouterLink
+              to="/tickets"
+              class="top-tab whitespace-nowrap"
+              :class="{ 'top-tab-active': isActive('/tickets') }"
+            >
+              Smart Tickets
+            </RouterLink>
+            <RouterLink
               v-if="isAdmin"
               to="/admin/usuarios"
               class="top-tab whitespace-nowrap"
@@ -212,7 +231,7 @@
         <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 md:py-8">
           <div class="max-w-6xl mx-auto">
             <RouterView v-slot="{ Component }">
-              <KeepAlive :include="['DashboardView', 'ConsultaView', 'AuditView', 'DiagnosticDashboard']">
+              <KeepAlive :include="['DashboardView', 'ConsultaView', 'AuditView', 'DiagnosticDashboard', 'TicketsView']">
                 <component :is="Component" />
               </KeepAlive>
             </RouterView>

@@ -65,6 +65,23 @@ async def test_list_queues_pagination():
         app.dependency_overrides.pop(get_current_user, None)
 
 
+@pytest.mark.asyncio
+async def test_list_queues_403_degrades_gracefully():
+    app.dependency_overrides[get_current_user] = _fake_user
+    try:
+        with patch("routes.queues.get_token", new_callable=AsyncMock) as mock_token:
+            mock_token.return_value = "fake_token"
+            with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+                mock_get.return_value = _resp(403, {})
+                response = client.get("/queues")
+                assert response.status_code == 200
+                data = response.json()
+                assert data["queues"] == []
+                assert "routing:queue:view" in data["warning"]
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_list_queues_requires_auth():
     # Sem override e sem cookie → 401
     response = client.get("/queues")
