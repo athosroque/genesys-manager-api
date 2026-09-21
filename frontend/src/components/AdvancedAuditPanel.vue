@@ -29,14 +29,14 @@
             <div>
               <label class="block text-xs font-semibold mb-1 text-amber-900">Fila Selecionada</label>
               <select v-model="selectedQueueId" class="w-full text-xs p-2 rounded border border-amber-300 bg-white">
-                <option v-for="q in auditResult.found_queue_ids" :key="q" :value="q">{{ q }}</option>
+                <option v-for="q in auditResult.found_queues" :key="q.id" :value="q.id">{{ q.name }}</option>
                 <option value="">Sem fila</option>
               </select>
             </div>
             <div>
               <label class="block text-xs font-semibold mb-1 text-amber-900">Usuário Selecionado</label>
               <select v-model="selectedUserId" class="w-full text-xs p-2 rounded border border-amber-300 bg-white">
-                <option v-for="u in auditResult.found_user_ids" :key="u" :value="u">{{ u }}</option>
+                <option v-for="u in auditResult.found_users" :key="u.id" :value="u.id">{{ u.name }}</option>
                 <option value="">Sem usuário</option>
               </select>
             </div>
@@ -87,7 +87,7 @@ const selectedUserId = ref('');
 
 const showMultipleWarning = computed(() => {
   if (!auditResult.value) return false;
-  return (auditResult.value.found_queue_ids?.length > 1) || (auditResult.value.found_user_ids?.length > 1);
+  return (auditResult.value.found_queues?.length > 1) || (auditResult.value.found_users?.length > 1);
 });
 
 const formattedJson = computed(() => {

@@ -141,6 +141,31 @@ async def get_advanced_audit(
     used_queue_id = queue_id or (found_queue_ids[0] if found_queue_ids else None)
     used_user_id = user_id or (found_user_ids[0] if found_user_ids else None)
 
+    # Buscar nomes das filas e usuários em paralelo para exibir nos selects
+    name_tasks = []
+    for q in found_queue_ids:
+        name_tasks.append(genesys_request("GET", f"/routing/queues/{q}"))
+    for u in found_user_ids:
+        name_tasks.append(genesys_request("GET", f"/users/{u}"))
+    
+    name_results = await asyncio.gather(*name_tasks, return_exceptions=True)
+    
+    found_queues = []
+    found_users = []
+    
+    idx = 0
+    for q in found_queue_ids:
+        res = name_results[idx]
+        name = res.get("name", "Desconhecido") if isinstance(res, dict) and res else "Desconhecido"
+        found_queues.append({"id": q, "name": name})
+        idx += 1
+        
+    for u in found_user_ids:
+        res = name_results[idx]
+        name = res.get("name", "Desconhecido") if isinstance(res, dict) and res else "Desconhecido"
+        found_users.append({"id": u, "name": name})
+        idx += 1
+
     tasks = {}
     
     if used_queue_id:
@@ -164,8 +189,8 @@ async def get_advanced_audit(
                 results[k] = res
 
     return {
-        "found_queue_ids": found_queue_ids,
-        "found_user_ids": found_user_ids,
+        "found_queues": found_queues,
+        "found_users": found_users,
         "used_queue_id": used_queue_id,
         "used_user_id": used_user_id,
         "audit_data": results
