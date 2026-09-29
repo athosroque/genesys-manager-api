@@ -15,7 +15,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-from routes import users, queues, groups, migration, auth_routes, audits, roles, divisions, analytics, diagnostics, tickets
+from routes import users, queues, groups, migration, auth_routes, audits, roles, divisions, analytics, diagnostics, tickets, system_diagnostics
 
 # Rotas de negócio
 app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
@@ -28,6 +28,7 @@ app.include_router(migration.router, prefix="/migration", tags=["Migration"])
 app.include_router(audits.router, prefix="/audits", tags=["Auditoria"])
 app.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
 app.include_router(diagnostics.router, prefix="/diagnostics", tags=["Diagnostics"])
+app.include_router(system_diagnostics.router, prefix="/system-diagnostics", tags=["System Diagnostics"])
 app.include_router(tickets.router, prefix="/tickets", tags=["Tickets"])
 
 @app.get("/config/groups")

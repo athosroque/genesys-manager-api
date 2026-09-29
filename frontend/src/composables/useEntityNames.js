@@ -94,7 +94,7 @@ function createBulkCache(loader) {
     if (!needle) return []
     const out = []
     for (const it of items) {
-      if (it.name?.toLowerCase().includes(needle)) {
+      if (it.name?.toLowerCase().includes(needle) || it.id?.toLowerCase().includes(needle)) {
         out.push(it)
         if (out.length >= limit) break
       }

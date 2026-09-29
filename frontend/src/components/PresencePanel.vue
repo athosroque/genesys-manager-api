@@ -23,14 +23,27 @@
           :max="maxDate"
           class="input py-2 max-w-[11rem] rounded-full"
         />
-        <button
-          type="button"
-          :disabled="loading || !session.selectedDate"
-          @click="fetchPresence"
-          class="btn-primary"
-        >
-          {{ loading ? 'Consultando…' : 'Consultar status' }}
-        </button>
+        <div class="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            :disabled="loading || !session.selectedDate"
+            @click="fetchPresence"
+            class="btn-primary"
+          >
+            {{ loading ? 'Consultando…' : 'Consultar status' }}
+          </button>
+          <button
+            v-if="session.result"
+            type="button"
+            @click="downloadDebugJson"
+            class="flex items-center justify-center p-2.5 bg-gray-100 text-gray-700 hover:bg-brand hover:text-white transition-all rounded-full shrink-0 shadow-sm"
+            title="Baixar JSON (Debug)"
+          >
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -363,6 +376,19 @@ async function fetchPresence() {
     loading.value = false
     requestAnimationFrame(measureBar)
   }
+}
+
+function downloadDebugJson() {
+  const result = session.value?.result
+  if (!result) return
+
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(result, null, 2))
+  const downloadAnchorNode = document.createElement('a')
+  downloadAnchorNode.setAttribute("href", dataStr)
+  downloadAnchorNode.setAttribute("download", `presence_${props.userId}_${session.value.selectedDate}.json`)
+  document.body.appendChild(downloadAnchorNode)
+  downloadAnchorNode.click()
+  downloadAnchorNode.remove()
 }
 
 defineExpose({

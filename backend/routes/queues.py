@@ -6,8 +6,11 @@ from auth_local import get_current_user
 
 router = APIRouter()
 
-PAGE_SIZE = 100
-MAX_PAGES = 25  # ~2500 filas: folga enorme; evita varredura sem fim
+# pageSize 500 é o teto do /routing/queues. Com ~5k filas na org, 100/página
+# batia no teto de 25 páginas e cortava a lista no meio do alfabeto (filas
+# TEL_CAR_* ficavam de fora do autocomplete da Trilha de Auditoria).
+PAGE_SIZE = 500
+MAX_PAGES = 40  # ~20k filas: folga enorme; evita varredura sem fim
 
 
 @router.get("")

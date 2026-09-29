@@ -16,7 +16,7 @@ import httpx
 from fastapi import HTTPException
 
 from auth import get_token, h
-from config import BASE_URL, DOMAIN
+from config import BASE_URL, DOMAIN, settings
 from routes.audits import (
     _create_and_poll,
     _enrich_group_membership_direction,
@@ -509,12 +509,22 @@ def _lookup(name_map: NameMap, entity_id: Optional[str], fallback: Optional[str]
 
 def _changed_by(event: dict) -> dict[str, Any]:
     if (event.get("level") or "").upper() == "SYSTEM":
-        return {"id": None, "name": None, "kind": "SYSTEM"}
+        return {"id": None, "name": "Sistema", "kind": "SYSTEM"}
     user = event.get("user") or {}
-    if user.get("id"):
+    uid = user.get("id")
+    if uid:
+        if settings.GENESYS_CLIENT_ID and uid.lower() == settings.GENESYS_CLIENT_ID.lower():
+            return {
+                "id": uid,
+                "name": "Genesys Manager (Integração)",
+                "kind": "INTEGRATION",
+            }
+        name = user.get("name")
+        if not name:
+            name = f"Integração OAuth ({uid[:8]}...)"
         return {
-            "id": user.get("id"),
-            "name": user.get("name"),
+            "id": uid,
+            "name": name,
             "kind": "USER",
         }
     return {"id": None, "name": None, "kind": "UNKNOWN"}
@@ -1271,3 +1281,114 @@ async def get_user_changes(
         "changes": final_result.get("changes"),
         "meta": final_result.get("meta"),
     }
+
+
+async def get_queue_changes(
+    queue_id: str,
+    interval_start: str,
+    interval_end: str,
+    *,
+    action_filter: Optional[str] = None,
+    target_user_id: Optional[str] = None,
+) -> dict[str, Any]:
+    """
+    Consulta alterações de auditoria específicas de uma fila (ContactCenter / Queue).
+    Diferencia remoção definitiva (MemberRemove), inativação (MemberUpdate:joined=false)
+    e adição (MemberAdd), atribuindo autoria (changed_by) e operador afetado (target_user).
+    """
+    qid = (queue_id or "").strip().strip("{}")
+    if not qid:
+        raise HTTPException(422, "O identificador da fila (queue_id) é obrigatório.")
+
+    # Janela máxima de até 30 dias (limite da Platform Audit API por query assíncrona)
+    start_dt, end_dt = validate_interval(interval_start, interval_end, max_days=30)
+    iso_start = format_iso(start_dt)
+    iso_end = format_iso(end_dt)
+
+    filters = [
+        {"property": "EntityType", "value": "Queue"},
+        {"property": "EntityId", "value": qid},
+    ]
+
+    action_clean = (action_filter or "").strip()
+    if action_clean and action_clean.lower() != "all":
+        filters.append({"property": "Action", "value": action_clean})
+
+    target_clean = (target_user_id or "").strip().strip("{}") if target_user_id else None
+
+    # Consulta assíncrona paginada na Genesys
+    events, truncated, scanned = await _paginated_audit(
+        service_name="ContactCenter",
+        filters=filters,
+        interval_start=iso_start,
+        interval_end=iso_end,
+        match_value=target_clean,
+        page_size=200,
+        max_pages=20,
+    )
+
+    # Carrega mapa de nomes de filas para obter o nome amigável da fila
+    maps = await fetch_name_maps()
+    queue_name = maps["queues"].get(qid)
+    if not queue_name:
+        try:
+            raw_q = await genesys_request("GET", f"/routing/queues/{qid}")
+            if raw_q.get("name"):
+                queue_name = raw_q["name"]
+                maps["queues"][qid] = queue_name
+        except Exception:
+            queue_name = qid
+
+    # Identifica membros afetados para resolução de nomes
+    user_ids_to_resolve = set()
+    for e in events:
+        for pc in e.get("propertyChanges") or []:
+            parsed = _parse_queue_member(pc.get("property") or "")
+            if parsed and parsed.get("user_id"):
+                user_ids_to_resolve.add(parsed["user_id"])
+
+    user_map: dict[str, dict] = {}
+    if user_ids_to_resolve:
+        async def _safe_resolve(uid: str):
+            try:
+                u = await resolve_user(uid)
+                return uid, u
+            except Exception:
+                return uid, {"id": uid, "name": None, "email": None}
+
+        # Resolve até 30 membros únicos em paralelo
+        limited_uids = list(user_ids_to_resolve)[:30]
+        results = await asyncio.gather(*(_safe_resolve(uid) for uid in limited_uids), return_exceptions=True)
+        for res in results:
+            if isinstance(res, tuple):
+                user_map[res[0]] = res[1]
+
+    cards: list[dict] = []
+    for e in events:
+        card = _card_queue(e, maps, user_map)
+        if not card:
+            continue
+        # Refinamento por target_user_id se informado
+        if target_clean:
+            card_user_id = (card.get("target_user") or {}).get("id")
+            if card_user_id and card_user_id.lower() != target_clean.lower():
+                continue
+        cards.append(card)
+
+    cards.sort(key=lambda c: c.get("event_date") or "", reverse=True)
+
+    return {
+        "queue": {"id": qid, "name": queue_name},
+        "interval": {"start": iso_start, "end": iso_end},
+        "changes": cards,
+        "total_events": len(cards),
+        "meta": {
+            "queue_id": qid,
+            "queue_name": queue_name,
+            "action_filter": action_clean or "all",
+            "target_user_id": target_clean,
+            "scanned": scanned,
+            "truncated": truncated,
+        },
+    }
+

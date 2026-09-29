@@ -9,7 +9,7 @@ from services.db_tickets import (
 )
 from services.ticket_automation import sync_tickets
 
-router = APIRouter(prefix="/tickets", tags=["tickets"])
+router = APIRouter()
 
 class TicketUpdate(BaseModel):
     classification: str

@@ -104,10 +104,20 @@
                         <td class="px-6 py-3 whitespace-nowrap text-xs text-gray-400 font-mono text-ellipsis overflow-hidden max-w-[150px]">
                           {{ q.id }}
                         </td>
-                        <td class="px-6 py-3 whitespace-nowrap text-right">
+                        <td class="px-6 py-3 whitespace-nowrap text-right space-x-2">
+                          <button
+                            @click.stop="goToQueueAudit(q)"
+                            class="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-brand bg-brand-soft border border-brand/25 rounded-full hover:bg-brand-soft/70 transition-all cursor-pointer"
+                            title="Auditar histórico de alterações desta fila"
+                          >
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                            </svg>
+                            Auditar
+                          </button>
                           <button
                             @click.stop="onRemoveFromQueue(q)"
-                            class="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 transition-all"
+                            class="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 transition-all cursor-pointer"
                             title="Remover desta fila"
                           >
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -366,6 +376,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import SearchBar from '../components/SearchBar.vue'
 import UserCard from '../components/UserCard.vue'
 import TelephonyPanel from '../components/TelephonyPanel.vue'
@@ -384,7 +395,20 @@ import {
   getGroupsConfig
 } from '../api/genesys'
 
+const router = useRouter()
 const { addToast } = useToast()
+
+function goToQueueAudit(q) {
+  if (!q?.id) return
+  router.push({
+    name: 'Auditoria',
+    query: {
+      queue_id: q.id,
+      queue_name: q.name || q.id,
+      target_user_id: user.value?.id || '',
+    },
+  })
+}
 
 // ─── Estado de busca ───────────────────────────────────────────────────────
 const lastQuery    = ref('')

@@ -7,6 +7,14 @@
           Auditoria Avançada
         </h2>
         <p class="text-sm text-slate-500 mt-1">Busca aprofundada de configurações (Filas, ACW, Copilot e Permissões)</p>
+        <ul class="mt-2 space-y-0.5 text-[11px] font-mono text-slate-400 leading-snug">
+          <li>GET /api/v2/analytics/conversations/{conversationId}/details</li>
+          <li>GET /api/v2/routing/queues/{queueId}</li>
+          <li>GET /api/v2/routing/queues/{queueId}/wrapupcodes</li>
+          <li>GET /api/v2/routing/queues/{queueId}/assistant</li>
+          <li>GET /api/v2/authorization/subjects/{userId}</li>
+          <li>GET /api/v2/integrations/unifiedcommunications/clientapps</li>
+        </ul>
       </div>
       <button 
         @click="runAudit" 

@@ -5,9 +5,14 @@
       class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors"
       @click="isOpen = !isOpen"
     >
-      <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
-        <span class="text-xl">🗂️</span> Gaveta de Dados Brutos (JSON)
-      </h3>
+      <div>
+        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+          <span class="text-xl">🗂️</span> Detalhes da Conversa (Interação)
+        </h3>
+        <p class="mt-1 text-[11px] font-mono text-slate-400 leading-snug">
+          GET /api/v2/analytics/conversations/{conversationId}/details
+        </p>
+      </div>
       <button class="text-slate-500 hover:text-slate-700 font-bold">
         {{ isOpen ? 'Ocultar ▲' : 'Exibir Detalhes ▼' }}
       </button>
