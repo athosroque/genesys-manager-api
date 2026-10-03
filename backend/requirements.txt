@@ -11,3 +11,4 @@ pydantic-settings
 resend
 sqlalchemy
 psycopg2-binary
+psycopg[binary]
