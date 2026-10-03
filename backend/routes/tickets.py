@@ -8,14 +8,16 @@ from services.db_tickets import (
     get_faq_metrics
 )
 from services.ticket_automation import sync_tickets
+from auth_local import get_current_user, require_admin
 
-router = APIRouter()
+# Todas as rotas exigem sessão; escrita/sync exigem admin.
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 class TicketUpdate(BaseModel):
     classification: str
     is_faq: bool
 
-@router.post("/sync")
+@router.post("/sync", dependencies=[Depends(require_admin)])
 async def trigger_sync():
     """Triggers the synchronization process with the external database."""
     result = sync_tickets()
@@ -41,7 +43,7 @@ async def get_ticket_details(external_id: str):
         raise HTTPException(status_code=404, detail="Ticket not found")
     return ticket
 
-@router.put("/{external_id}")
+@router.put("/{external_id}", dependencies=[Depends(require_admin)])
 async def update_ticket(external_id: str, update_data: TicketUpdate):
     """Allows humans to review and update the ticket's classification and FAQ status."""
     ticket = get_ticket(external_id)

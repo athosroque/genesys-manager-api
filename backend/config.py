@@ -43,6 +43,21 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+
+def validate_production_settings() -> None:
+    """Aborta o startup em produção se algum segredo estiver ausente ou fraco."""
+    if settings.ENVIRONMENT != "production":
+        return
+    problemas = []
+    if len(settings.JWT_SECRET_KEY) < 32:
+        problemas.append("JWT_SECRET_KEY ausente ou com menos de 32 caracteres")
+    if ":postgres@" in settings.DATABASE_URL:
+        problemas.append("DATABASE_URL usa a senha padrão 'postgres'")
+    if not settings.GENESYS_CLIENT_SECRET:
+        problemas.append("GENESYS_CLIENT_SECRET ausente")
+    if problemas:
+        raise RuntimeError("Configuração insegura: " + "; ".join(problemas))
+
 # Constantes reais do projeto
 REGION = settings.GENESYS_REGION
 DOMAIN = "@corp.caixa.gov.br"

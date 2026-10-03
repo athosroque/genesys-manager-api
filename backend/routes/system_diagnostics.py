@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from auth_local import get_current_user
 from services.genesys_system import get_flow_diagnostics, get_script_diagnostics
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 @router.get("/flow")
 async def get_flow(name_or_id: str = Query(..., description="Nome exato ou ID do Fluxo")):
@@ -15,7 +16,7 @@ async def get_flow(name_or_id: str = Query(..., description="Nome exato ou ID do
     except HTTPException as e:
         raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro interno ao buscar fluxo: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erro interno ao buscar fluxo.")
 
 @router.get("/script")
 async def get_script(
@@ -35,5 +36,5 @@ async def get_script(
     except HTTPException as e:
         raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro interno ao buscar script: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erro interno ao buscar script.")
 

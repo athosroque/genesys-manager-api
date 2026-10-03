@@ -19,6 +19,7 @@ from auth_local import (
 )
 from config import settings
 from email_service import send_magic_link
+from rate_limit import check_rate_limit
 from token_store import (
     create_magic_link_token,
     consume_magic_link_token,
@@ -87,6 +88,10 @@ async def login(payload: LoginRequest):
     Domínio fora do permitido é rejeitado com 400.
     """
     email = payload.email.strip().lower()
+
+    # Anti-spam de e-mail (Resend) e anti-enumeração: por destinatário e teto global
+    check_rate_limit(f"login:{email}", max_hits=5, window_seconds=900)
+    check_rate_limit("login:global", max_hits=60, window_seconds=60)
 
     if not is_allowed_email_domain(email):
         raise HTTPException(
