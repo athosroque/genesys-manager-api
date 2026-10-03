@@ -1,0 +1,7 @@
+# Troque AGE_PUBLIC_KEY pela chave pública gerada com age-keygen (a privada vai
+# para o Bitwarden e para ~/.config/sops/age/keys.txt na VM — nunca para o git).
+creation_rules:
+  - path_regex: \.env\.enc$
+    input_type: dotenv
+    output_type: dotenv
+    age: AGE_PUBLIC_KEY

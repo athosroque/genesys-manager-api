@@ -188,6 +188,35 @@ npm run dev
 
 ---
 
+## 🔒 Segredos (SOPS + age) e deploy seguro
+
+O `.env` em claro **não existe em disco** na VM de produção. Os segredos ficam em
+`backend/.env.enc` (versionado, criptografado com [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age)).
+A chave privada age fica no **Bitwarden** e em `~/.config/sops/age/keys.txt` (0600) só na VM.
+
+```bash
+# 1ª vez: gerar a chave (copie o conteúdo de keys.txt para uma nota segura no Bitwarden)
+age-keygen -o ~/.config/sops/age/keys.txt
+# coloque a "public key" no lugar de AGE_PUBLIC_KEY em .sops.yaml
+
+# criptografar o .env (depois apague o original com shred -u backend/.env)
+sops --encrypt --input-type dotenv --output-type dotenv backend/.env > backend/.env.enc
+
+# editar segredos (abre o $EDITOR com o conteúdo em claro, recriptografa ao salvar)
+sops --input-type dotenv --output-type dotenv backend/.env.enc
+
+# deploy: descriptografa em /run/genesys (tmpfs) e sobe a stack
+./scripts/deploy.sh
+```
+
+Recuperação: restaure `keys.txt` a partir do Bitwarden na nova máquina e rode `./scripts/deploy.sh`.
+Backup criptografado (Postgres + `users.json`): `./scripts/backup.sh` (agendar diário via cron).
+
+Acesso administrativo **somente por SSH tunnel**: `ssh -L 8082:127.0.0.1:8082 deploy@<vm>` → http://localhost:8082.
+O acesso público passa pelo Cloudflare Access antes de chegar ao magic link.
+
+---
+
 ## 🔑 Variáveis de Ambiente
 
 Arquivo `backend/.env` (copie de `backend/.env.example`). **Não** coloque secrets no frontend — só `VITE_API_BASE_URL`.
