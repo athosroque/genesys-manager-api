@@ -5,12 +5,12 @@
 
 ## Contexto
 
-O genesys-manager-api (FastAPI + Vue/nginx + Postgres) está saindo do servidor
+O genesys-manager-api (FastAPI + Vue/nginx, sem banco) está saindo do servidor
 antigo (`192.168.0.101`) para esta VM isolada no Proxmox. A parte de código já
 foi feita na branch `security/hardening-proxmox`:
 
 - auth obrigatória em todas as rotas, rate limit no login, Swagger off em produção;
-- containers não-root, rootfs read-only, Postgres sem porta publicada (rede interna);
+- containers não-root, rootfs read-only, só o frontend publica porta (127.0.0.1);
 - segredos em `backend/.env.enc` via **SOPS + age**, descriptografados só em
   tmpfs (`/run/genesys/.env`) por `scripts/deploy.sh`;
 - runbook completo em `docs/MIGRACAO-PROXMOX.md` (referência principal).
@@ -40,7 +40,7 @@ foi feita na branch `security/hardening-proxmox`:
    `~/.config/sops/age/keys.txt` (0600). Nunca no repositório.
 4. `backend/.env` em claro deve existir apenas o tempo de criptografar, depois
    `shred -u`.
-5. Não rodar `docker compose down -v` (apaga o volume do Postgres).
+5. `users.json` e `auth_tokens.json` são o único estado da aplicação: não apagar.
 6. Commits só quando o usuário pedir, em Conventional Commits, em português.
 
 ## Passo 1 — Validar o hardening
@@ -96,19 +96,16 @@ Valores esperados (o usuário fornece os secretos):
 |---|---|
 | `ENVIRONMENT` | `production` |
 | `COOKIE_DOMAIN` | vazio |
-| `CORS_ORIGINS` | `https://genesys.projetoathos.com.br` |
+| `CORS_ORIGINS` | `https://manager-genesys.projetoathos.com.br` |
 | `GENESYS_CLIENT_ID` / `GENESYS_CLIENT_SECRET` | **usuário** (secret regenerado) |
 | `GENESYS_REGION` | `sae1.pure.cloud` |
 | `JWT_SECRET_KEY` | **usuário** (64 hex) |
 | `JWT_ALGORITHM` / `JWT_EXPIRE_MINUTES` | `HS256` / `2880` |
 | `RESEND_API_KEY` | **usuário** (nova) |
 | `RESEND_FROM_EMAIL` | **usuário** |
-| `APP_BASE_URL` | `https://genesys.projetoathos.com.br` |
+| `APP_BASE_URL` | `https://manager-genesys.projetoathos.com.br` |
 | `ALLOWED_EMAIL_DOMAIN` | `claro.com.br` (confirmar com usuário) |
 | `MAGIC_LINK_EXPIRE_MINUTES` | `10` |
-| `CLOUDFLARE_API_TOKEN` / `_ACCOUNT_ID` / `_ZONE_ID` | **usuário** |
-| `POSTGRES_PASSWORD` | **usuário** (hex) |
-| `DATABASE_URL` | `postgresql+psycopg://postgres:<POSTGRES_PASSWORD>@db:5432/genesys_manager` |
 | `CLOUDFLARE_TUNNEL_TOKEN` | **usuário** |
 
 Validar sem expor valores e criptografar:
@@ -116,22 +113,21 @@ Validar sem expor valores e criptografar:
 ```bash
 sed 's/=.*/=***/' backend/.env | grep -v '^#' | grep .
 # checagens automáticas (não imprimem valores):
-. <(grep -E '^(POSTGRES_PASSWORD|DATABASE_URL|JWT_SECRET_KEY)=' backend/.env)
+. <(grep -E '^JWT_SECRET_KEY=' backend/.env)
 [ ${#JWT_SECRET_KEY} -ge 32 ] && echo "JWT ok"
-[[ "$DATABASE_URL" == *":${POSTGRES_PASSWORD}@db:5432/"* ]] && echo "DATABASE_URL bate com POSTGRES_PASSWORD"
-[[ "$DATABASE_URL" == postgresql+psycopg://* ]] && echo "driver ok"
-unset POSTGRES_PASSWORD DATABASE_URL JWT_SECRET_KEY
+unset JWT_SECRET_KEY
 
-sops --encrypt --input-type dotenv --output-type dotenv backend/.env > backend/.env.enc
+# --filename-override: a regra do .sops.yaml casa com \.env\.enc$, não com backend/.env
+sops --encrypt --filename-override backend/.env.enc --input-type dotenv --output-type dotenv backend/.env > backend/.env.enc
 sops --decrypt --input-type dotenv --output-type dotenv backend/.env.enc | sed 's/=.*/=***/' | head -3  # prova que descriptografa
 shred -u backend/.env
 ```
 
 ## Passo 4.1 — Variáveis do compose no shell
 
-O `docker-compose.yml` exige `POSTGRES_PASSWORD` na interpolação, então **todo**
-`docker compose` fora do `deploy.sh` (`ps`, `exec`, `logs`) precisa apontar para
-o env descriptografado. Adicionar uma vez ao `~/.bashrc` do `deploy`:
+O backend lê o `env_file` em `/run/genesys/.env` e o cloudflared interpola
+`CLOUDFLARE_TUNNEL_TOKEN`, então **todo** `docker compose` fora do `deploy.sh`
+(`ps`, `exec`, `logs`) precisa apontar para o env descriptografado. Adicionar uma vez ao `~/.bashrc` do `deploy`:
 
 ```bash
 cat >> ~/.bashrc <<'RC'
@@ -146,29 +142,22 @@ docker compose version   # COMPOSE_ENV_FILES exige Compose >= 2.24
 `/run/genesys/.env` só existe depois do primeiro `deploy.sh` (Passos 6/7).
 `backup.sh` e a unit systemd já exportam essas variáveis.
 
-## Passo 5 — Postgres 16
+## Passo 5 — (removido)
 
-Volume novo, então pode subir direto na 16. Em `docker-compose.yml`, trocar
-`postgres:15-alpine` → `postgres:16-alpine` e remover o comentário de upgrade.
+O Postgres saiu da stack junto com a funcionalidade Smart Tickets. Não há banco
+para criar nem atualizar.
 
 ## Passo 6 — Migrar dados
 
-O usuário traz do servidor antigo (`192.168.0.101`) para `/tmp` da VM:
-`genesys.sql` (pg_dump) e `users.json`. Comando no servidor antigo:
-`docker exec genesys-manager-api-db-1 pg_dump -U postgres genesys_manager > /tmp/genesys.sql`.
+Só o `users.json` migra. O usuário traz do servidor antigo (`192.168.0.101`)
+para `/tmp` da VM.
 
 ```bash
 cd /opt/genesys-manager-api
 install -m 600 /tmp/users.json backend/users.json
 echo '{"tokens": []}' > backend/auth_tokens.json && chmod 600 backend/auth_tokens.json
-COMPOSE_PROFILE=none ./scripts/deploy.sh db
-sleep 5
-docker compose exec -T db psql -U postgres -d genesys_manager -v ON_ERROR_STOP=1 < /tmp/genesys.sql
-docker compose exec -T db psql -U postgres -d genesys_manager -c '\dt'
-shred -u /tmp/genesys.sql /tmp/users.json
+shred -u /tmp/users.json
 ```
-
-Se não houver dump (banco vazio aceitável), pular o restore e confirmar com o usuário.
 
 ## Passo 7 — Subir a stack completa + systemd
 
@@ -190,14 +179,13 @@ com dono `deploy`. Se `deploy.sh` reclamar de permissão, conferir isso.
 # containers e isolamento
 docker compose exec backend id                         # uid=1000(app)
 docker inspect -f '{{.Name}} ro={{.HostConfig.ReadonlyRootfs}}' $(docker compose ps -q)
-docker compose exec backend python -c "import socket; socket.create_connection(('db',5432),2); print('db ok')"
-docker compose exec db sh -c 'wget -q -T3 -O- https://1.1.1.1 && echo VAZOU || echo "db sem internet ok"'
-ss -tlnp | grep -E ':5432|:8082'                       # 8082 só em 127.0.0.1; 5432 ausente
+docker compose exec frontend sh -c 'wget -q -T3 -O- https://1.1.1.1 && echo VAZOU || echo "frontend sem internet ok"'
+ss -tlnp | grep ':8082'                                # só em 127.0.0.1
 
 # app
 curl -s -o /dev/null -w '%{http_code}\n' localhost:8082/                   # 200
 curl -s localhost:8082/api/health                                           # {"status":"ok"}
-curl -s -o /dev/null -w '%{http_code}\n' localhost:8082/api/tickets/        # 401
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8082/api/config/groups   # 401
 curl -s -o /dev/null -w '%{http_code}\n' localhost:8082/api/docs            # 404
 curl -sI localhost:8082/ | grep -Ei 'content-security|x-frame|strict-transport'
 
@@ -206,7 +194,7 @@ ls -l /run/genesys/.env                                # existe, 600, deploy
 test ! -e backend/.env && echo "sem .env em claro no disco"
 git status --short                                     # .env.enc pode aparecer; nada de .env
 
-# testes dentro da imagem (rede interna alcança o db)
+# testes dentro da imagem (sem banco: rodam direto)
 docker compose run --rm --no-deps -v "$PWD/backend:/app" -e ENVIRONMENT=test backend python -m pytest -q -p no:cacheprovider
 #   esperado: tudo passa exceto 3 falhas pré-existentes em test_user_audit.py
 ```
@@ -221,7 +209,7 @@ Reboot: `sudo reboot` → destravar LUKS no console do Proxmox → após o boot,
 
 ```bash
 sudo install -d -o deploy -g deploy /var/backups/genesys
-./scripts/backup.sh && ls -l /var/backups/genesys
+./scripts/backup.sh && ls -l /var/backups/genesys   # state-*.tar.gz.age (users.json + auth_tokens.json)
 ( crontab -l 2>/dev/null; echo '0 3 * * * /opt/genesys-manager-api/scripts/backup.sh' ) | crontab -
 ```
 
@@ -235,7 +223,7 @@ Lembrar o usuário: `vzdump` semanal da VM no Proxmox (Datacenter → Backup).
 - **Cloudflare Access:** decisão adiada pelo usuário.
 - **Servidor antigo:** `docker compose down`, `docker image rm genesys-manager-api-backend`
   (imagem antiga contém o `.env`), `shred -u backend/.env`.
-- Commitar `backend/.env.enc` e a troca para Postgres 16 quando o usuário pedir.
+- Commitar `backend/.env.enc` e a remoção do Postgres quando o usuário pedir.
 
 ## Relatório final esperado
 

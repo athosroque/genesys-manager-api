@@ -1,22 +1,4 @@
 services:
-  db:
-    # Upgrade para postgres:16 só na migração para a VM (exige dump/restore do volume)
-    image: postgres:15-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      # Sem default: compose falha se a senha não vier do .env descriptografado
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-genesys_manager}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    # Sem "ports": Postgres só é alcançável pela rede interna do compose
-    networks:
-      - genesys-internal
-    security_opt:
-      - no-new-privileges:true
-    mem_limit: 1g
-
   backend:
     build:
       context: ./backend
@@ -26,7 +8,6 @@ services:
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-production}
       COOKIE_DOMAIN: ""
-      CORS_ORIGINS: "https://genesys.projetoathos.com.br"
     restart: unless-stopped
     # Persistência fora da imagem: recreate não apaga magic links nem users.
     # Criar auth_tokens.json no host antes do primeiro up se o arquivo não existir
@@ -36,8 +17,6 @@ services:
       - ./backend/auth_tokens.json:/app/auth_tokens.json
     expose:
       - "8000"
-    depends_on:
-      - db
     networks:
       - genesys-internal
       - genesys-egress
@@ -62,6 +41,8 @@ services:
       - backend
     networks:
       - genesys-internal
+      # Docker >= 28 não publica portas de container só em rede internal
+      - genesys-publish
     read_only: true
     tmpfs:
       - /tmp
@@ -76,7 +57,8 @@ services:
     profiles: ["tunnel"]
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
+    # http2 (TCP 443): o firewall do Proxmox não libera o QUIC (UDP 7844)
+    command: tunnel --no-autoupdate --protocol http2 run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
     networks:
@@ -89,13 +71,17 @@ services:
       - no-new-privileges:true
 
 networks:
-  # Sem rota para fora: db nunca fala com a internet
+  # Sem rota para fora: frontend nunca fala com a internet; backend e
+  # cloudflared saem só pela genesys-egress
   genesys-internal:
     name: genesys-internal
     internal: true
   # Saída para Genesys/Resend/Cloudflare
   genesys-egress:
     name: genesys-egress
-
-volumes:
-  postgres_data:
+  # Só para publicar 127.0.0.1:8082 do frontend. Sem masquerade não há NAT de
+  # saída, então o frontend continua sem acesso à internet.
+  genesys-publish:
+    name: genesys-publish
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
