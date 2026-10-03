@@ -4,4 +4,4 @@ creation_rules:
   - path_regex: \.env\.enc$
     input_type: dotenv
     output_type: dotenv
-    age: AGE_PUBLIC_KEY
+    age: age1ntdu46q8t59zeyzkwtqxfmudm5fwc6f2t6hfwxgycaht02t4hf5s43duxd

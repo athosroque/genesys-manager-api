@@ -73,7 +73,7 @@ git add backend/.env.enc .sops.yaml && git commit -m "chore(infra): segredos cri
 No host antigo:
 
 ```bash
-docker compose exec -T db pg_dump -U postgres genesys_manager > /tmp/genesys.sql
+docker exec genesys-manager-api-db-1 pg_dump -U postgres genesys_manager > /tmp/genesys.sql
 scp /tmp/genesys.sql backend/users.json deploy@<ip-vm>:/tmp/
 shred -u /tmp/genesys.sql
 ```

@@ -42,3 +42,6 @@ refencia_retornos/PROMPT-NORMALIZACAO-NOMES.md
 backend/*.json
 !backend/package.json
 retorno_auditoria_conversa.json
+
+# Bancos SQLite locais
+*.db
