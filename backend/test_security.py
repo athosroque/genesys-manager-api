@@ -46,9 +46,6 @@ def test_todas_as_rotas_exigem_autenticacao():
 @pytest.mark.parametrize(
     "method,path",
     [
-        ("GET", "/tickets/"),
-        ("PUT", "/tickets/abc"),
-        ("POST", "/tickets/sync"),
         ("GET", "/system-diagnostics/flow?name_or_id=x"),
         ("GET", "/auth/test"),
         ("GET", "/config/groups"),
@@ -56,7 +53,7 @@ def test_todas_as_rotas_exigem_autenticacao():
 )
 async def test_rotas_antes_abertas_retornam_401_sem_cookie(method, path):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        response = await ac.request(method, path, json={"classification": "x", "is_faq": False})
+        response = await ac.request(method, path)
     assert response.status_code == 401
 
 

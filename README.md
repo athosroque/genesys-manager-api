@@ -9,7 +9,6 @@
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![Vue.js](https://img.shields.io/badge/Vue.js-3-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=flat-square&logo=postgresql&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Container-2496ED?style=flat-square&logo=docker&logoColor=white)
 ![Cloudflare](https://img.shields.io/badge/Cloudflare-Zero%20Trust-F38020?style=flat-square&logo=cloudflare&logoColor=white)
@@ -33,8 +32,6 @@
 - **🚀 Frontend:** [Vue 3 App](frontend/)
 - **⚙️ Backend:** [FastAPI Core](backend/)
 - **🔐 Auth local:** [Magic link + JWT](backend/auth_local.py) · [Rotas](backend/routes/auth_routes.py)
-- **📊 Tickets & FAQ:** [Gestão de Chamados e Base de Conhecimento](frontend/src/views/TicketsView.vue)
-- **🔄 Pipeline ETL Zero Trust:** [Guia de Sincronização](docs/SINCRONIZACAO_SQLITE_POSTGRES.md) · [Instruções para Origem](INSTRUCOES_ORIGEM_SYNC.md)
 
 ---
 
@@ -52,8 +49,6 @@ Originalmente um script manual no Google Colab, a gestão de usuários no Genesy
 - **Dashboard de Diagnóstico de Interações** — interface focada na auditoria e análise técnica de chamadas e interações usando um `conversationId`. Inclui identificação imediata sobre origem do atendimento (transferência humana ou bot/URA), métricas da chamada, trilha temporal visual (Timeline), diagnóstico WebRTC/Borda AWS e extração dos detalhes consolidados, auxiliando rapidamente na resolução de chamados técnicos relatados por operadores.
 - **Auditoria Avançada (API Orchestration / BFF)** — extração e consolidação em tempo real do ecossistema de uma interação com apenas 1 clique. Ao informar um `conversationId`, o backend age como orquestrador buscando simultaneamente: regras de Timeout e ACW da Fila, Wrapup Codes mapeados, Assistente/Copilot configurado na fila, Permissões efetivas do Agente e Políticas de Client Apps (iFrames), gerando um JSON técnico unificado para detecção imediata de causa raiz.
 - **Trilha de Auditoria** — alterações de uma pessoa no período (limitado a 48h para buscas profundas para garantir estabilidade): **Pesquisar** traz só divisão; botões separados buscam filas, roles ou grupos (merge na lista), via streaming SSE em tempo real (`POST /audits/user-changes/stream`) com progresso granular e cards normalizados no frontend.
-- **Gestão de Tickets & Base de Conhecimento (FAQ)** — visualização e acompanhamento de chamados técnicos enriquecidos, curadoria humana de classificações e identificação de perguntas frequentes (FAQ) com métricas agregadas.
-- **Pipeline ETL SQLite ➔ PostgreSQL via Cloudflare Zero Trust** — sincronização contínua a cada 10s de chamados originados em base legada SQLite remota através de túnel seguro TCP (`postgres.projetoathos.com.br`) sem expor portas públicas na internet, com suporte a Watermark e UPSERT idempotente.
 
 ## 🔐 Autenticação (resumo)
 
@@ -90,36 +85,33 @@ Detalhes e riscos residuais: [backend/README.md](backend/README.md#segurança).
 | Tecnologia | Função | Vantagem |
 | :--- | :--- | :--- |
 | **Python / FastAPI** | API Backend | Performante, assíncrona e tipagem forte. |
-| **PostgreSQL 15** | Banco de Dados Relacional | Persistência confiável de tickets enriquecidos e FAQ. |
 | **Vue 3 / Vite** | Dashboard Frontend | Interface reativa e rápida com Composition API. |
 | **Tailwind CSS 3** | Design System | Estilização moderna e layout responsivo. |
-| **Cloudflare Zero Trust** | Conectividade & Segurança | Túneis mTLS e transporte TCP seguro sem portas abertas. |
-| **Docker Compose** | Infraestrutura | Reprodutibilidade total do ambiente produtivo (stack com 3 containers). |
+| **Cloudflare Tunnel** | Conectividade & Segurança | Túnel de saída (`cloudflared`) sem portas abertas na VM. |
+| **Docker Compose** | Infraestrutura | Reprodutibilidade total do ambiente produtivo (frontend, backend e cloudflared). |
 
 ## 📁 Estrutura do Projeto
 
 | Pasta / arquivo | Para que serve |
 | :--- | :--- |
-| `backend/` | API FastAPI, ORM PostgreSQL, worker ETL, proxy Genesys |
-| `frontend/` | SPA Vue 3 (login, consulta/migração, trilha de auditoria, tickets, admin) |
-| `docs/` | Guias técnicos (`SINCRONIZACAO_SQLITE_POSTGRES.md`, WebRTC, etc.) |
-| `INSTRUCOES_ORIGEM_SYNC.md` | Guia completo com credenciais para execução na máquina de origem SQLite |
+| `backend/` | API FastAPI, proxy Genesys |
+| `frontend/` | SPA Vue 3 (login, consulta/migração, trilha de auditoria, diagnóstico, admin) |
+| `docs/` | Guias técnicos (`MIGRACAO-PROXMOX.md`, WebRTC, etc.) |
 | `refencia_retornos/` | Material de referência da Audit API (dicionário, âncora, amostras locais) |
 | `docs/arquivo/` | Código/UI histórica fora do runtime (ex.: CLI de senha, UI antiga de auditoria) |
 | `reports/figures/` | Banner e assets visuais do README / portfólio |
 | `portfolio.html` | Página estática de apresentação do projeto |
-| `docker-compose.yml` | Stack local: db (Postgres 15) + backend + frontend (nginx na porta **8082**) |
+| `docker-compose.yml` | Stack: backend + frontend (nginx na porta **8082**) + cloudflared (profile `tunnel`) |
 | `.gitignore` | Ignora `.env`, credenciais Cloudflare, `users.json`, `auth_tokens.json`, etc. |
 
 ```text
-├── backend/                    # Runtime da API e Worker ETL
+├── backend/                    # Runtime da API
 ├── frontend/                   # Runtime da SPA
 ├── docs/                       # Documentação técnica e guias de infra
-├── INSTRUCOES_ORIGEM_SYNC.md   # Guia pronto para envio à máquina SQLite
 ├── refencia_retornos/          # Referência Audit API (não é serviço)
 ├── reports/figures/            # Assets visuais
 ├── portfolio.html              # Landing de portfólio
-└── docker-compose.yml          # Orquestração (Frontend + Backend + PostgreSQL)
+└── docker-compose.yml          # Orquestração (Frontend + Backend + cloudflared)
 ```
 
 ## 🛠️ Pré-requisitos
@@ -210,7 +202,7 @@ sops --input-type dotenv --output-type dotenv backend/.env.enc
 ```
 
 Recuperação: restaure `keys.txt` a partir do Bitwarden na nova máquina e rode `./scripts/deploy.sh`.
-Backup criptografado (Postgres + `users.json`): `./scripts/backup.sh` (agendar diário via cron).
+Backup criptografado (`users.json` + `auth_tokens.json`): `./scripts/backup.sh` (agendar diário via cron).
 
 Acesso administrativo **somente por SSH tunnel**: `ssh -L 8082:127.0.0.1:8082 deploy@<vm>` → http://localhost:8082.
 O acesso público passa pelo Cloudflare Access antes de chegar ao magic link.
@@ -238,13 +230,10 @@ Arquivo `backend/.env` (copie de `backend/.env.example`). **Não** coloque secre
 | `CORS_ORIGINS` | Origens permitidas (dev) | `http://localhost:5173,...` |
 | `RESEND_API_KEY` | API key Resend (só backend) | `re_xxxxxxxxx` |
 | `RESEND_FROM_EMAIL` | Remetente em domínio verificado | `Genesys Manager <noreply@projetoathos.com.br>` |
-| `APP_BASE_URL` | Base pública (link do e-mail + redirect) | `https://genesys.projetoathos.com.br` — definida só no `.env` (o Compose **não** sobrescreve). Para testar magic links só em localhost, altere temporariamente no `backend/.env`; não bakeie localhost no `docker-compose.yml` se a stack também servir o domínio público. |
+| `APP_BASE_URL` | Base pública (link do e-mail + redirect) | `https://manager-genesys.projetoathos.com.br` — definida só no `.env` (o Compose **não** sobrescreve). Para testar magic links só em localhost, altere temporariamente no `backend/.env`; não bakeie localhost no `docker-compose.yml` se a stack também servir o domínio público. |
 | `ALLOWED_EMAIL_DOMAIN` | Domínio aceito no login/cadastro | `claro.com.br` |
 | `MAGIC_LINK_EXPIRE_MINUTES` | TTL do magic link | `10` |
-| `DATABASE_URL` | String de conexão com o PostgreSQL | `postgresql://postgres:postgres@db:5432/genesys_manager` |
-| `CLOUDFLARE_API_TOKEN` | Token da API Cloudflare (Tunnels/Access) | `cfut_xxxxxxxxx` |
-| `CLOUDFLARE_ACCOUNT_ID` | ID da conta Cloudflare Zero Trust | `8254abaf6f...` |
-| `CLOUDFLARE_ZONE_ID` | ID da zona DNS na Cloudflare | `cf71e2c7ce...` |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Token do túnel (container `cloudflared`, profile `tunnel`) | `eyJ...` |
 
 Arquivos sensíveis **gitignored**: `.env`, `backend/users.json`, `backend/auth_tokens.json`, `backend/.cloudflare_service_token.json`.
 

@@ -15,7 +15,4 @@ pytest.ini
 check_perms*.py
 consultar_*.py
 validate_webrtc.py
-migrate_sqlite_to_postgres.py
-etl_sync_sqlite_to_postgres.py
-requirements-etl.txt
 README.md
