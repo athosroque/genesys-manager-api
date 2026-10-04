@@ -18,8 +18,10 @@ export function toDatetimeLocalValue(date = new Date()) {
 /**
  * datetime-local (naive, fuso local) → ISO UTC para a API.
  * Não usa `new Date("YYYY-MM-DDTHH:mm")` (histórico ES5/UTC ambíguo).
+ * Se isEndOfPeriod for true e segundos não vierem explicitados no input (padrão
+ * do datetime-local), fixa em 59 segundos e 999ms para cobrir o minuto inteiro.
  */
-export function datetimeLocalToIso(value) {
+export function datetimeLocalToIso(value, isEndOfPeriod = false) {
   if (!value || typeof value !== 'string') {
     throw new Error('Data local inválida')
   }
@@ -28,11 +30,12 @@ export function datetimeLocalToIso(value) {
   const timeBits = timePart.split(':').map(Number)
   const hh = timeBits[0] || 0
   const mm = timeBits[1] || 0
-  const ss = timeBits[2] || 0
+  const ss = timeBits[2] != null ? timeBits[2] : (isEndOfPeriod ? 59 : 0)
+  const ms = isEndOfPeriod ? 999 : 0
   if (![y, m, day].every((n) => Number.isFinite(n))) {
     throw new Error(`Data local inválida: ${value}`)
   }
-  return new Date(y, m - 1, day, hh, mm, ss).toISOString()
+  return new Date(y, m - 1, day, hh, mm, ss, ms).toISOString()
 }
 
 /**
@@ -51,7 +54,9 @@ export function presetPeriodRange(presetId) {
     const start = new Date(end.getTime() - 48 * 3600 * 1000)
     return { start: toDatetimeLocalValue(start), end: toDatetimeLocalValue(end) }
   }
-  const days = presetId === '30d' ? 30 : 7
+  let days = 7
+  if (presetId === '30d') days = 30
+  else if (presetId === '15d') days = 15
   const start = new Date(
     end.getFullYear(),
     end.getMonth(),

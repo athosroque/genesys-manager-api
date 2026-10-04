@@ -125,9 +125,15 @@
           </div>
 
           <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
-            <p>
+            <p class="flex items-center gap-1.5">
               <span class="text-gray-400">Alterado por</span>
-              {{ changedByLabel(card.changed_by) }}
+              <span class="font-medium text-ink">{{ changedByLabel(card.changed_by) }}</span>
+              <span
+                v-if="card.changed_by?.kind === 'INTEGRATION'"
+                class="rounded bg-brand-soft text-brand px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase border border-brand/20"
+              >
+                API
+              </span>
             </p>
             <p class="font-mono text-gray-400">{{ formatEventDate(card.event_date) }}</p>
           </div>
@@ -309,8 +315,9 @@ function isNarrativeCard(card) {
 function changedByLabel(by) {
   if (!by) return 'Desconhecido'
   if (by.kind === 'SYSTEM') return by.name || 'Sistema'
+  if (by.kind === 'INTEGRATION') return by.name || 'Genesys Manager (Integração)'
   if (by.kind === 'UNKNOWN' && !by.name) return 'Desconhecido'
-  return by.name || by.id || 'Desconhecido'
+  return by.name || (by.id ? `Usuário (${by.id.slice(0, 8)}...)` : 'Desconhecido')
 }
 
 function formatEventDate(iso) {
@@ -328,8 +335,9 @@ function narrativeSentence(card) {
   const resource = card.resource?.name || card.resource?.id || '—'
   const who = changedByLabel(card.changed_by)
   const when = formatEventDate(card.event_date)
-  if (card.target_user?.name && (props.queriedUsers?.length > 1 || userChips.value.length > 1)) {
-    return `${prefix} ${resource} para ${card.target_user.name} por ${who} em ${when}`
+  const targetName = card.target_user?.name || card.target_user?.email
+  if (targetName && (props.queriedUsers?.length > 1 || userChips.value.length > 1 || card.category === 'queue')) {
+    return `${prefix} ${resource} para ${targetName} por ${who} em ${when}`
   }
   return `${prefix} ${resource} por ${who} em ${when}`
 }

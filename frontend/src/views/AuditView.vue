@@ -13,6 +13,7 @@
       :loading-category="loadingCategory"
       @search="runBaseSearch"
       @deep-search="runDeepSearch"
+      @queue-search="runQueueSearch"
       @clear="onClear"
       @cancel="cancelSearch"
     />
@@ -122,11 +123,17 @@
         <span class="font-semibold text-ink text-sm">
           {{ changes.length }} alteração{{ changes.length === 1 ? '' : 'ões' }} encontrada{{ changes.length === 1 ? '' : 's' }}
         </span>
-        <span v-if="queriedUsers.length > 1" class="text-gray-400">
+        <span v-if="meta?.queue_name" class="rounded-full bg-brand-soft border border-brand/20 px-2.5 py-0.5 text-xs text-brand font-semibold">
+          📋 Fila: {{ meta.queue_name }}
+        </span>
+        <span v-else-if="queriedUsers.length > 1" class="text-gray-400">
           (para {{ queriedUsers.length }} pessoas consultadas)
         </span>
       </div>
-      <div v-if="meta?.scanned_total" class="text-gray-500">
+      <div v-if="meta?.scanned" class="text-gray-500">
+        Varredura analisou <span class="font-mono font-medium text-ink">{{ meta.scanned.toLocaleString('pt-BR') }}</span> eventos na Genesys
+      </div>
+      <div v-else-if="meta?.scanned_total" class="text-gray-500">
         Varredura analisou <span class="font-mono font-medium text-ink">{{ meta.scanned_total.toLocaleString('pt-BR') }}</span> eventos da organização
       </div>
     </div>
@@ -165,14 +172,16 @@
     />
   </div>
 </template>
-
 <script setup>
-import { computed, ref } from 'vue'
-import { getUserChanges, streamUserChanges } from '../api/audits'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { getQueueChanges, getUserChanges, streamUserChanges } from '../api/audits'
 import { useToast } from '../composables/useToast'
 import AuditSearchBar from '../components/AuditSearchBar.vue'
 import UserChangesList from '../components/UserChangesList.vue'
 import { datetimeLocalToIso } from '../utils/datetimeLocal'
+
+const route = useRoute()
 
 const { addToast } = useToast()
 
@@ -370,7 +379,7 @@ async function runBaseSearch({ user, start, end }) {
   try {
     const userRef = user.email || user.id
     const interval_start = datetimeLocalToIso(start)
-    const interval_end = datetimeLocalToIso(end)
+    const interval_end = datetimeLocalToIso(end, true)
 
     const data = await getUserChanges(
       {
@@ -436,7 +445,7 @@ async function runDeepSearch({ user, users, start, end, category }) {
 
   try {
     const interval_start = datetimeLocalToIso(start)
-    const interval_end = datetimeLocalToIso(end)
+    const interval_end = datetimeLocalToIso(end, true)
 
     const payload = {
       users: userList.map((u) => u.email || u.id),
@@ -560,4 +569,79 @@ async function runDeepSearch({ user, users, start, end, category }) {
     }
   }
 }
+
+async function runQueueSearch({ queue, action, targetUser, start, end }) {
+  if (!queue?.id) return
+  const { signal, seq } = beginSearchRequest()
+  loadingCategory.value = null
+  loadingBase.value = true
+  searched.value = true
+  error.value = ''
+  emptyNotice.value = null
+  progressState.value = null
+  queriedUsers.value = targetUser ? [targetUser] : []
+  changes.value = []
+  meta.value = null
+  fetchedDeepCategories.value = ['queue']
+  truncatedByCategory.value = {}
+
+  try {
+    const interval_start = datetimeLocalToIso(start)
+    const interval_end = datetimeLocalToIso(end, true)
+
+    const payload = {
+      queue_id: queue.id,
+      interval_start,
+      interval_end,
+      action_filter: action !== 'all' ? action : null,
+      target_user_id: targetUser?.id || null,
+    }
+
+    const data = await getQueueChanges(payload, { signal })
+    if (isStale(seq)) return
+    changes.value = data.changes || []
+    meta.value = data.meta || null
+    if (data.meta?.truncated) {
+      truncatedByCategory.value = { queue: true }
+    }
+    if (!(data.changes || []).length) {
+      setEmptyNotice('queue')
+    } else {
+      addToast(
+        `${data.changes.length} evento(s) encontrado(s) na fila ${queue.name || queue.id}.`,
+        'success',
+      )
+    }
+  } catch (err) {
+    if (isStale(seq) || isAbortError(err)) return
+    error.value = err.message
+    emptyNotice.value = null
+    addToast(err.message, 'error')
+  } finally {
+    if (!isStale(seq)) {
+      loadingBase.value = false
+      activeController = null
+    }
+  }
+}
+
+function applyRouteQueueQuery(query) {
+  if (!query?.queue_id) return
+  searchBar.value?.setQueueMode({
+    queueId: String(query.queue_id),
+    queueName: query.queue_name ? String(query.queue_name) : null,
+    targetUserId: query.target_user_id ? String(query.target_user_id) : null,
+  })
+}
+
+onMounted(() => {
+  applyRouteQueueQuery(route.query)
+})
+
+watch(
+  () => [route.query.queue_id, route.query.target_user_id],
+  () => {
+    applyRouteQueueQuery(route.query)
+  },
+)
 </script>

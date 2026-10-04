@@ -41,3 +41,15 @@ export const streamUserChanges = (body, onEvent, options = {}) =>
         onEvent,
         ...options,
     })
+
+/**
+ * Auditoria direta por fila específica (ContactCenter / Queue).
+ * Body: { queue_id, interval_start, interval_end, action_filter?, target_user_id? }
+ */
+export const getQueueChanges = (body, options = {}) =>
+    request('/audits/queue-changes', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        ...options,
+    })
+

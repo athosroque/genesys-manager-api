@@ -13,6 +13,7 @@ from jose import jwt
 
 import auth_local
 import token_store
+from rate_limit import reset_rate_limits
 from config import settings
 from main import app
 
@@ -67,6 +68,7 @@ def auth_env(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "APP_BASE_URL", "https://genesys.example.com")
     monkeypatch.setattr(settings, "ENVIRONMENT", "development")
     monkeypatch.setattr(settings, "RESEND_API_KEY", "re_test")
+    reset_rate_limits()
 
     return {"users_file": users_file, "tokens_file": tokens_file}
 

@@ -1,4 +1,18 @@
+# Nunca levar segredos, dados ou PII para a imagem
+.env
+.env.*
+*.json
+*.db
+*.sqlite*
 .venv
+venv
 .pytest_cache
 __pycache__
 *.pyc
+test_*.py
+conftest.py
+pytest.ini
+check_perms*.py
+consultar_*.py
+validate_webrtc.py
+README.md

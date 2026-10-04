@@ -1,0 +1,24 @@
+# /etc/systemd/system/genesys-manager.service — sobe a stack após reboot
+# (o .env em /run some no reboot; deploy.sh o recria a partir do .env.enc).
+[Unit]
+Description=Genesys Manager (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=deploy
+WorkingDirectory=/opt/genesys-manager-api
+RuntimeDirectory=genesys
+RuntimeDirectoryMode=0700
+Environment=COMPOSE_ENV_FILES=/run/genesys/.env
+Environment=GENESYS_ENV_FILE=/run/genesys/.env
+# Sem isto, o ExecStop (compose down) ignora o cloudflared, que está no profile tunnel
+Environment=COMPOSE_PROFILES=tunnel
+Environment=SOPS_AGE_KEY_FILE=/home/deploy/.config/sops/age/keys.txt
+ExecStart=/opt/genesys-manager-api/scripts/deploy.sh
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target

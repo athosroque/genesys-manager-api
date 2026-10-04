@@ -7,6 +7,9 @@ __pycache__/
 venv/
 env/
 .env
+.env.*
+!.env.example
+!.env.enc
 .pytest_cache/
 
 # Node
@@ -34,3 +37,11 @@ refencia_retornos/amostras/
 # como histórico, mas não versionadas (conteúdo duplicado/contradito)
 refencia_retornos/REFERENCIA_RETORNOS.md
 refencia_retornos/PROMPT-NORMALIZACAO-NOMES.md
+
+# Amostras e retornos de chamadas/APIs (contem PII / dados de teste)
+backend/*.json
+!backend/package.json
+retorno_auditoria_conversa.json
+
+# Bancos SQLite locais
+*.db

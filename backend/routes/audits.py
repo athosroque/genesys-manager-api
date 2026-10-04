@@ -523,6 +523,39 @@ async def stream_user_changes_route(
     )
 
 
+class QueueChangesRequest(BaseModel):
+    queue_id: str = Field(..., description="UUID da fila na Genesys")
+    interval_start: str = Field(..., description="ISO 8601, ex: 2026-07-01T00:00:00Z")
+    interval_end: str = Field(..., description="ISO 8601, ex: 2026-07-31T23:59:59Z")
+    action_filter: Optional[str] = Field(
+        default=None,
+        description="Filtro de ação: 'all' | 'MemberRemove' | 'MemberUpdate' | 'MemberAdd'",
+    )
+    target_user_id: Optional[str] = Field(
+        default=None,
+        description="UUID opcional de operador para refinar o resultado da fila",
+    )
+
+
+@router.post("/queue-changes")
+async def queue_changes_route(
+    body: QueueChangesRequest, current_user: dict = Depends(get_current_user)
+) -> dict:
+    """
+    Auditoria direta de uma fila específica (ContactCenter / Queue).
+    Permite auditar remoções definitivas, inativações e adições por até 30 dias.
+    """
+    from services.user_audit import get_queue_changes
+
+    return await get_queue_changes(
+        queue_id=body.queue_id,
+        interval_start=body.interval_start,
+        interval_end=body.interval_end,
+        action_filter=body.action_filter,
+        target_user_id=body.target_user_id,
+    )
+
+
 @router.get("/search/{transaction_id}/results")
 async def get_audit_results(
     transaction_id: str,
