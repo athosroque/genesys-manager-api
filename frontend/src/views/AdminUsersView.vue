@@ -160,6 +160,7 @@
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 tracking-wider">E-mail</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 tracking-wider">Papel</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 tracking-wider">2FA</th>
               <th class="px-6 py-3 text-right text-xs font-medium text-gray-400 tracking-wider">
                 <span class="sr-only">Ações</span>
               </th>
@@ -200,21 +201,42 @@
                   {{ u.active ? 'Ativo' : 'Inativo' }}
                 </span>
               </td>
-              <td class="px-6 py-4 text-right">
-                <button
-                  type="button"
-                  @click="confirmTarget = u"
-                  :disabled="isSelf(u) || deletingUsername === u.username"
-                  :title="isSelf(u) ? 'Você não pode excluir a si mesmo' : 'Excluir usuário'"
-                  class="px-3 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed text-red-600 hover:bg-red-50 border border-red-200"
+              <td class="px-6 py-4">
+                <span
+                  class="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"
+                  :class="u.totp_enabled ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'"
                 >
-                  <LoadingSpinner v-if="deletingUsername === u.username" class="w-3 h-3" />
-                  Excluir
-                </button>
+                  {{ u.totp_enabled ? 'Ativo' : 'Pendente' }}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <button
+                    v-if="!isSelf(u)"
+                    type="button"
+                    @click="handleResetTotp(u)"
+                    :disabled="resettingTotpUsername === u.username"
+                    title="Resetar 2FA do usuário"
+                    class="px-3 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed text-orange-600 hover:bg-orange-50 border border-orange-200"
+                  >
+                    <LoadingSpinner v-if="resettingTotpUsername === u.username" class="w-3 h-3" />
+                    Resetar 2FA
+                  </button>
+                  <button
+                    type="button"
+                    @click="confirmTarget = u"
+                    :disabled="isSelf(u) || deletingUsername === u.username"
+                    :title="isSelf(u) ? 'Você não pode excluir a si mesmo' : 'Excluir usuário'"
+                    class="px-3 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed text-red-600 hover:bg-red-50 border border-red-200"
+                  >
+                    <LoadingSpinner v-if="deletingUsername === u.username" class="w-3 h-3" />
+                    Excluir
+                  </button>
+                </div>
               </td>
             </tr>
             <tr v-if="filteredUsers.length === 0">
-              <td colspan="6" class="px-6 py-10 text-center text-sm text-gray-400">
+              <td colspan="7" class="px-6 py-10 text-center text-sm text-gray-400">
                 {{ users.length === 0 ? 'Nenhum usuário cadastrado.' : 'Nenhum usuário corresponde à busca.' }}
               </td>
             </tr>
@@ -240,7 +262,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { createLocalUser, deleteLocalUser, listLocalUsers } from '../api/auth'
+import { createLocalUser, deleteLocalUser, listLocalUsers, resetUserTotp } from '../api/auth'
 import { useAuth } from '../composables/useAuth'
 import { useToast } from '../composables/useToast'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
@@ -265,6 +287,7 @@ const form = reactive({
 
 const confirmTarget = ref(null)
 const deletingUsername = ref(null)
+const resettingTotpUsername = ref(null)
 
 const filteredUsers = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -343,6 +366,25 @@ async function handleDelete() {
     addToast(err.message || 'Falha ao excluir usuário.', 'error')
   } finally {
     deletingUsername.value = null
+  }
+}
+
+async function handleResetTotp(user) {
+  if (isSelf(user)) return
+
+  if (!confirm(`Resetar 2FA de ${user.full_name || user.username}? O usuário precisará configurar novamente na próxima entrada.`)) {
+    return
+  }
+
+  resettingTotpUsername.value = user.username
+  try {
+    await resetUserTotp(user.username)
+    addToast(`2FA de ${user.full_name || user.username} foi resetado.`, 'success')
+    await loadUsers()
+  } catch (err) {
+    addToast(err.message || 'Falha ao resetar 2FA.', 'error')
+  } finally {
+    resettingTotpUsername.value = null
   }
 }
 

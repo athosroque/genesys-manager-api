@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     ALLOWED_EMAIL_DOMAIN: str = os.getenv("ALLOWED_EMAIL_DOMAIN", "claro.com.br")
     MAGIC_LINK_EXPIRE_MINUTES: int = int(os.getenv("MAGIC_LINK_EXPIRE_MINUTES", 10))
 
+    # TOTP 2FA (criptografia de segredos)
+    TOTP_ENCRYPTION_KEY: str = os.getenv("TOTP_ENCRYPTION_KEY", "")
+
     @property
     def cookie_max_age(self) -> int:
         """Idade máxima do cookie em segundos (espelha JWT_EXPIRE_MINUTES)."""
@@ -45,6 +48,8 @@ def validate_production_settings() -> None:
         problemas.append("JWT_SECRET_KEY ausente ou com menos de 32 caracteres")
     if not settings.GENESYS_CLIENT_SECRET:
         problemas.append("GENESYS_CLIENT_SECRET ausente")
+    if not settings.TOTP_ENCRYPTION_KEY:
+        problemas.append("TOTP_ENCRYPTION_KEY ausente")
     if problemas:
         raise RuntimeError("Configuração insegura: " + "; ".join(problemas))
 

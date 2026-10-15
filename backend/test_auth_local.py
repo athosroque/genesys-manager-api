@@ -196,7 +196,8 @@ async def test_verify_get_does_not_consume_token(auth_env):
 
 
 @pytest.mark.asyncio
-async def test_verify_post_sets_session_and_allows_multiple_uses(auth_env):
+async def test_verify_post_sets_preauth_and_allows_multiple_uses(auth_env):
+    """POST /verify agora retorna pré-autenticação (status + cookie pre_auth_token)."""
     raw = token_store.create_magic_link_token("alice")
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
@@ -204,27 +205,28 @@ async def test_verify_post_sets_session_and_allows_multiple_uses(auth_env):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["user"]["username"] == "alice"
-    assert "access_token" in response.cookies
+    assert body["status"] == "totp_setup_required"  # alice não tem 2FA
+    assert "pre_auth_token" in response.cookies
 
-    cookie_token = response.cookies["access_token"]
+    cookie_token = response.cookies["pre_auth_token"]
     payload = jwt.decode(
         cookie_token,
         settings.JWT_SECRET_KEY,
         algorithms=[settings.JWT_ALGORITHM],
     )
     assert payload["sub"] == "alice"
+    assert payload["scope"] == "2fa"
 
     # Segundo e terceiro POST funcionam normalmente (válido por 10 min, múltiplos usos)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         again = await ac.post("/auth/verify", json={"token": raw})
     assert again.status_code == 200
-    assert again.json()["user"]["username"] == "alice"
+    assert again.json()["status"] == "totp_setup_required"
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         third = await ac.post("/auth/verify", json={"token": raw})
     assert third.status_code == 200
-    assert third.json()["user"]["username"] == "alice"
+    assert third.json()["status"] == "totp_setup_required"
 
 
 @pytest.mark.asyncio
@@ -256,7 +258,7 @@ async def test_verify_head_does_not_consume(auth_env):
 @pytest.mark.asyncio
 async def test_sliding_session_renews_cookie(auth_env):
     token = auth_local.create_access_token(
-        data={"sub": "alice"},
+        data={"sub": "alice", "mfa": True},
         expires_delta=timedelta(minutes=60),
     )
     old_payload = jwt.decode(
@@ -280,13 +282,14 @@ async def test_sliding_session_renews_cookie(auth_env):
         algorithms=[settings.JWT_ALGORITHM],
     )
     assert new_payload["sub"] == "alice"
+    assert new_payload["mfa"] is True
     assert new_payload["exp"] > old_payload["exp"]
 
 
 @pytest.mark.asyncio
 async def test_idle_expired_session_returns_401(auth_env):
     expired = auth_local.create_access_token(
-        data={"sub": "alice"},
+        data={"sub": "alice", "mfa": True},
         expires_delta=timedelta(seconds=-10),
     )
 
@@ -298,16 +301,20 @@ async def test_idle_expired_session_returns_401(auth_env):
 
 @pytest.mark.asyncio
 async def test_logout_clears_session_cookie(auth_env):
-    """Logout deve emitir Set-Cookie que remove access_token (max-age=0 / expires)."""
-    token = auth_local.create_access_token(data={"sub": "alice"})
+    """Logout deve emitir Set-Cookie que remove access_token e pre_auth_token."""
+    token = auth_local.create_access_token(data={"sub": "alice", "mfa": True})
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.post("/auth/logout", cookies={"access_token": token})
 
     assert response.status_code == 200
-    set_cookie = response.headers.get("set-cookie", "").lower()
-    assert "access_token=" in set_cookie
-    assert "max-age=0" in set_cookie or "expires=" in set_cookie
+    # Verificar que ambos os cookies são removidos
+    set_cookie_lower = response.headers.get("set-cookie", "").lower()
+    # Pode haver múltiplas Set-Cookie headers
+    all_cookies = response.headers.get_list("set-cookie")
+    all_cookies_lower = " ".join([c.lower() for c in all_cookies])
+    assert "access_token=" in all_cookies_lower
+    assert "max-age=0" in all_cookies_lower or "expires=" in all_cookies_lower
 
 
 def test_build_magic_link_uses_api_prefix(auth_env):
@@ -348,7 +355,7 @@ def test_send_magic_link_allows_claro_domain(auth_env):
 
 
 def _admin_cookie() -> dict:
-    token = auth_local.create_access_token(data={"sub": "admin"})
+    token = auth_local.create_access_token(data={"sub": "admin", "mfa": True})
     return {"access_token": token}
 
 
@@ -517,7 +524,7 @@ async def test_delete_local_user_not_found(auth_env):
 
 @pytest.mark.asyncio
 async def test_delete_local_user_requires_admin(auth_env):
-    token = auth_local.create_access_token(data={"sub": "alice"})
+    token = auth_local.create_access_token(data={"sub": "alice", "mfa": True})
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.delete(
             "/auth/users/inactive",

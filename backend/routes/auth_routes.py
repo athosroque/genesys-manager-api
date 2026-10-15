@@ -1,13 +1,14 @@
 from typing import Literal, Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from auth_local import (
     create_access_token,
     get_current_user,
     require_admin,
+    get_pre_auth_user,
     load_users,
     save_users,
     hash_password,
@@ -16,6 +17,10 @@ from auth_local import (
     is_allowed_email_domain,
     set_session_cookie,
     clear_session_cookie,
+    set_pre_auth_cookie,
+    clear_pre_auth_cookie,
+    create_pre_auth_token,
+    sanitize_user,
 )
 from config import settings
 from email_service import send_magic_link
@@ -24,6 +29,15 @@ from token_store import (
     create_magic_link_token,
     consume_magic_link_token,
     peek_magic_link_token,
+)
+from totp_service import (
+    generate_secret,
+    provisioning_uri,
+    encrypt_secret,
+    decrypt_secret,
+    verify_code,
+    generate_recovery_codes,
+    consume_recovery_code,
 )
 
 router = APIRouter()
@@ -52,14 +66,24 @@ class CreateLocalUserRequest(BaseModel):
     )
 
 
+class TwoFAConfirmSetupRequest(BaseModel):
+    code: str = Field(..., min_length=6, max_length=6, description="Código TOTP de 6 dígitos")
+
+
+class TwoFAVerifyRequest(BaseModel):
+    code: Optional[str] = Field(None, min_length=6, max_length=6, description="Código TOTP")
+    recovery_code: Optional[str] = Field(None, description="Código de recuperação")
+
+
 def _public_user(user: dict) -> dict:
-    """Campos públicos de um usuário local (sem hashed_password)."""
+    """Campos públicos de um usuário local (sem hashed_password e segredos TOTP)."""
     return {
         "username": user["username"],
         "full_name": user.get("full_name"),
         "email": user.get("email"),
         "role": user.get("role"),
         "active": user.get("active", False),
+        "totp_enabled": user.get("totp_enabled", False),
     }
 
 
@@ -178,8 +202,13 @@ async def verify_magic_link_head(token: str = ""):
 @router.post("/verify")
 async def confirm_magic_link(payload: VerifyConfirmRequest):
     """
-    Autentica via magic link (válido por 10 minutos, permite múltiplos usos):
-    seta cookie JWT e devolve JSON para o frontend completar o login.
+    Autentica via magic link (válido por 10 minutos, permite múltiplos usos).
+
+    NÃO seta sessão completa. Em vez disso:
+    - Seta cookie pré-autenticação (5 min, scope="2fa")
+    - Retorna status de 2FA:
+      - "totp_required": usuário já tem 2FA configurada
+      - "totp_setup_required": primeiro login, precisa configurar 2FA
     """
     username = consume_magic_link_token(payload.token, purpose="login")
     if not username:
@@ -196,27 +225,29 @@ async def confirm_magic_link(payload: VerifyConfirmRequest):
             detail=LINK_INVALID_DETAIL,
         )
 
-    access_token = create_access_token(data={"sub": username})
+    # Determinar próximo passo 2FA
+    totp_enabled = user.get("totp_enabled", False)
+    status_2fa = "totp_required" if totp_enabled else "totp_setup_required"
+
+    # Criar token pré-autenticação
+    pre_auth_token = create_pre_auth_token(username)
+
     response = JSONResponse(
         content={
-            "message": "Acesso autorizado.",
-            "user": {
-                "username": user["username"],
-                "full_name": user.get("full_name"),
-                "email": user.get("email"),
-                "role": user.get("role"),
-            },
+            "status": status_2fa,
+            "message": f"Próximo passo: {'confirme seu código TOTP' if totp_enabled else 'configure 2FA'}.",
         }
     )
-    set_session_cookie(response, access_token)
+    set_pre_auth_cookie(response, pre_auth_token)
     return response
 
 
 
 @router.post("/logout")
 async def logout(response: Response):
-    """Remove o cookie de sessão do navegador (mesmos atributos do set)."""
+    """Remove os cookies de sessão e pré-autenticação do navegador."""
     clear_session_cookie(response)
+    clear_pre_auth_cookie(response)
     return {"message": "Sessão encerrada"}
 
 
@@ -224,6 +255,192 @@ async def logout(response: Response):
 async def get_me(current_user: dict = Depends(get_current_user)):
     """Retorna os dados do usuário autenticado pela sessão atual."""
     return current_user
+
+
+# ─── 2FA (TOTP) ────────────────────────────────────────────────────────────
+
+@router.post("/2fa/setup")
+async def setup_totp(
+    pre_auth_user: dict = Depends(get_pre_auth_user),
+):
+    """
+    Inicia setup de 2FA (TOTP).
+
+    Requer pré-autenticação (cookie pre_auth_token com scope="2fa").
+    Se usuário já tem 2FA ativo, retorna 400.
+    Senão, gera segredo, o armazena criptografado em totp_pending_enc,
+    e retorna otpauth_uri + secret para o frontend.
+    """
+    username = pre_auth_user["username"]
+
+    # Carregar usuário completo (com campos sensíveis) para verificação
+    users = load_users()
+    user = next((u for u in users if u["username"] == username), None)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
+
+    # Rejeitar se já tem 2FA ativo
+    if user.get("totp_enabled"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA já está ativado para este usuário. Use /2fa/reset para começar novamente."
+        )
+
+    # Gerar segredo
+    secret = generate_secret()
+    encrypted_secret = encrypt_secret(secret)
+
+    # Armazenar em totp_pending_enc (ainda não ativo)
+    user["totp_pending_enc"] = encrypted_secret
+    save_users(users)
+
+    # Gerar URI para QR code
+    uri = provisioning_uri(username, secret)
+
+    return {
+        "otpauth_uri": uri,
+        "secret": secret,
+        "message": "Escaneie o QR code ou entre manualmente a chave."
+    }
+
+
+@router.post("/2fa/confirm-setup")
+async def confirm_setup_totp(
+    payload: TwoFAConfirmSetupRequest,
+    pre_auth_user: dict = Depends(get_pre_auth_user),
+    response: Response = None,
+):
+    """
+    Confirma setup de 2FA.
+
+    Valida código TOTP contra segredo pendente (totp_pending_enc).
+    Se válido:
+    - Move pending -> active (totp_secret_enc)
+    - Marca totp_enabled = True
+    - Gera 10 recovery codes (hashes armazenados)
+    - Emite sessão completa (access_token com mfa=true)
+    - Limpa pre_auth cookie
+    - Retorna recovery codes (exibidos uma vez)
+
+    Rate limit: 5 tentativas / 15 min por usuário.
+    """
+    username = pre_auth_user["username"]
+
+    # Rate limit
+    check_rate_limit(f"2fa:{username}", max_hits=5, window_seconds=900)
+
+    # Carregar usuário
+    users = load_users()
+    user = next((u for u in users if u["username"] == username), None)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
+
+    # Verificar se já está ativo
+    if user.get("totp_enabled"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA já está ativo.")
+
+    # Verificar se tem segredo pendente
+    if not user.get("totp_pending_enc"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nenhuma configuração de 2FA pendente. Use /2fa/setup primeiro."
+        )
+
+    # Validar código contra pending secret
+    if not verify_code(user, payload.code, secret_field="totp_pending_enc"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Código inválido.")
+
+    # Sucesso: move pending -> active
+    user["totp_secret_enc"] = user.pop("totp_pending_enc")
+    user["totp_enabled"] = True
+    # totp_last_step já foi gravado por verify_code: não resetar (anti-replay do código de setup)
+
+    # Gerar recovery codes
+    plain_codes, hashed_codes = generate_recovery_codes(n=10)
+    user["totp_recovery_hashes"] = hashed_codes
+
+    # Salvar usuário
+    save_users(users)
+
+    # Emitir sessão completa
+    access_token = create_access_token(data={"sub": username, "mfa": True})
+    set_session_cookie(response, access_token)
+    clear_pre_auth_cookie(response)
+
+    return {
+        "user": sanitize_user(user),
+        "recovery_codes": plain_codes,
+        "message": "2FA ativado com sucesso! Salve os códigos de recuperação em um local seguro."
+    }
+
+
+@router.post("/2fa/verify")
+async def verify_totp(
+    payload: TwoFAVerifyRequest,
+    pre_auth_user: dict = Depends(get_pre_auth_user),
+    response: Response = None,
+):
+    """
+    Verifica código TOTP ou recovery code.
+
+    Requer exatamente um de: code (TOTP) ou recovery_code.
+    Se válido, emite sessão completa (access_token com mfa=true).
+
+    Rate limit:
+    - Por usuário: 5 tentativas / 15 min
+    - Global: 60 tentativas / 1 min
+
+    Erros genéricos (401) para não vazar informações.
+    """
+    username = pre_auth_user["username"]
+
+    # Validar payload
+    if (payload.code and payload.recovery_code) or (not payload.code and not payload.recovery_code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Forneça exatamente um de: code ou recovery_code."
+        )
+
+    # Rate limit
+    check_rate_limit(f"2fa:{username}", max_hits=5, window_seconds=900)
+    check_rate_limit("2fa:global", max_hits=60, window_seconds=60)
+
+    # Carregar usuário
+    users = load_users()
+    user = next((u for u in users if u["username"] == username), None)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Código inválido.")
+
+    if not user.get("totp_enabled"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Código inválido.")
+
+    valid = False
+
+    # Tentar validar código TOTP
+    if payload.code:
+        valid = verify_code(user, payload.code, secret_field="totp_secret_enc")
+        if valid:
+            save_users(users)  # Salvar totp_last_step atualizado
+    # Tentar consumir recovery code
+    elif payload.recovery_code:
+        valid = consume_recovery_code(username, payload.recovery_code)
+
+    if not valid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Código inválido.")
+
+    # Sucesso: emitir sessão
+    access_token = create_access_token(data={"sub": username, "mfa": True})
+    set_session_cookie(response, access_token)
+    clear_pre_auth_cookie(response)
+
+    # Recarregar usuário sanitizado para retorno
+    users = load_users()
+    user = next((u for u in users if u["username"] == username), None)
+
+    return {
+        "user": sanitize_user(user),
+        "message": "Autenticação bem-sucedida."
+    }
 
 
 # ─── Gestão de usuários locais (somente admin) ─────────────────────────────
@@ -329,4 +546,53 @@ async def delete_local_user(username: str, admin: dict = Depends(require_admin))
     return {
         "message": f"Usuário {removed.get('username')} removido.",
         "username": removed.get("username"),
+    }
+
+
+@router.post("/users/{username}/2fa/reset")
+async def admin_reset_2fa(username: str, admin: dict = Depends(require_admin)):
+    """
+    Reseta 2FA de um usuário (admin only).
+
+    Remove campos TOTP:
+    - totp_secret_enc
+    - totp_pending_enc
+    - totp_last_step
+    - totp_recovery_hashes
+    - totp_enabled
+
+    Restrições:
+    - Não permite reset na própria conta (admin.username != username)
+    - Retorna 404 se usuário não existe
+    """
+    needle = username.strip().lower()
+    admin_username = (admin.get("username") or "").strip().lower()
+
+    if needle == admin_username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Você não pode resetar sua própria 2FA.",
+        )
+
+    users = load_users()
+    user = next((u for u in users if (u.get("username") or "").strip().lower() == needle), None)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuário não encontrado.",
+        )
+
+    # Limpar campos TOTP (mesmo que _não_ estejam presentes)
+    user.pop("totp_secret_enc", None)
+    user.pop("totp_pending_enc", None)
+    user.pop("totp_last_step", None)
+    user.pop("totp_recovery_hashes", None)
+    user.pop("totp_enabled", None)
+
+    save_users(users)
+
+    return {
+        "message": f"2FA de {user.get('username')} foi resetada.",
+        "username": user.get("username"),
     }

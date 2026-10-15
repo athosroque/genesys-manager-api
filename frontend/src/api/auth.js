@@ -61,3 +61,30 @@ export const deleteLocalUser = (username) =>
     request(`/auth/users/${encodeURIComponent(username)}`, {
         method: 'DELETE',
     })
+
+/** Setup TOTP — usuário sem 2FA configurado. Retorna {otpauth_uri, secret}. */
+export const setupTotp = () =>
+    request('/auth/2fa/setup', {
+        method: 'POST',
+        body: JSON.stringify({})
+    })
+
+/** Confirma setup de TOTP com código. Retorna {user, recovery_codes}. */
+export const confirmTotpSetup = (code) =>
+    request('/auth/2fa/confirm-setup', {
+        method: 'POST',
+        body: JSON.stringify({ code })
+    })
+
+/** Verifica TOTP — usuário com 2FA ativo. Aceita {code} ou {recovery_code}. */
+export const verifyTotp = (payload) =>
+    request('/auth/2fa/verify', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    })
+
+/** Reset de TOTP por admin — rejeita se tentar em si mesmo. */
+export const resetUserTotp = (username) =>
+    request(`/auth/users/${encodeURIComponent(username)}/2fa/reset`, {
+        method: 'POST',
+    })
