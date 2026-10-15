@@ -106,6 +106,7 @@ Valores esperados (o usuário fornece os secretos):
 | `APP_BASE_URL` | `https://manager-genesys.projetoathos.com.br` |
 | `ALLOWED_EMAIL_DOMAIN` | `claro.com.br` (confirmar com usuário) |
 | `MAGIC_LINK_EXPIRE_MINUTES` | `10` |
+| `TOTP_ENCRYPTION_KEY` | chave Fernet (44 chars): `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Cifra os segredos TOTP em `users.json`; **sem ela o backend não sobe em produção**. Não rotacionar sem resetar o 2FA de todos |
 | `CLOUDFLARE_TUNNEL_TOKEN` | **usuário** |
 
 Validar sem expor valores e criptografar:
@@ -197,6 +198,24 @@ git status --short                                     # .env.enc pode aparecer;
 # testes dentro da imagem (sem banco: rodam direto)
 docker compose run --rm --no-deps -v "$PWD/backend:/app" -e ENVIRONMENT=test backend python -m pytest -q -p no:cacheprovider
 #   esperado: tudo passa exceto 3 falhas pré-existentes em test_user_audit.py
+```
+
+2FA (TOTP obrigatório após o magic link):
+
+```bash
+docker compose exec backend ls totp_service.py             # código novo na imagem
+docker compose exec backend python -c "import urllib.request as u,urllib.error as e
+try: u.urlopen('http://127.0.0.1:8000/auth/me')
+except e.HTTPError as x: print(x.code)"                     # 401 sem cookie
+```
+
+Primeiro login após o deploy: o magic link leva ao cadastro do autenticador (QR +
+10 códigos de recuperação) e as sessões antigas são invalidadas. Usuário sem acesso
+ao app: admin usa "Resetar 2FA" na tela de usuários. Se for o último admin, na VM:
+
+```bash
+GENESYS_ENV_FILE=/run/genesys/.env docker compose --env-file /run/genesys/.env \
+  run --rm --no-deps -v "$PWD:/repo" backend python /repo/scripts/reset_2fa.py <username>
 ```
 
 Pelo PC do usuário: `ssh -L 8082:127.0.0.1:8082 deploy@192.168.0.110` e abrir

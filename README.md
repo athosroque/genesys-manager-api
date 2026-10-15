@@ -224,6 +224,7 @@ Arquivo `backend/.env` (copie de `backend/.env.example`). **Não** coloque secre
 - **Presença / Analytics:** requer o scope **`analytics:readonly`** no mesmo client (`GENESYS_CLIENT_ID`), com role da integração autorizada a analytics user detail nas divisões (FGAC). Sem isso a API responde **403** (ou resultado vazio se faltar grant de divisão). Detalhes: [`docs/ANALYTICS-PRESENCA-CONSULTA.md`](docs/ANALYTICS-PRESENCA-CONSULTA.md).
 - **Diagnóstico de Interações e Telefonia:** são necessários os scopes e permissões adicionais `analytics:conversationDetail:view`, `telephony:providers:view`, `telephony:station:view` e `telephony:phone:view`.
 | `JWT_SECRET_KEY` | Assinatura dos JWTs locais | `openssl rand -hex 32` |
+| `TOTP_ENCRYPTION_KEY` | Chave Fernet que cifra os segredos TOTP (2FA) em `users.json`; obrigatória em produção | `Fernet.generate_key().decode()` |
 | `JWT_EXPIRE_MINUTES` | Idle da sessão (sliding) | `2880` (48h) |
 | `ENVIRONMENT` | Flags de cookie (Secure / SameSite) | `development` / `production` |
 | `COOKIE_DOMAIN` | Domain do cookie (prod); vazio no Compose local | `.projetoathos.com.br` ou vazio |

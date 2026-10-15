@@ -57,6 +57,7 @@ excluía). Considere todos os segredos expostos e gere novos:
 |---|---|
 | `GENESYS_CLIENT_SECRET` | Genesys Admin → Integrations → OAuth → client → Regenerate |
 | `JWT_SECRET_KEY` | `openssl rand -hex 32` (derruba todas as sessões) |
+| `TOTP_ENCRYPTION_KEY` | `Fernet.generate_key()` — trocar invalida os segredos TOTP: resetar o 2FA de todos os usuários |
 | `RESEND_API_KEY` | resend.com/api-keys → revogar a antiga, criar nova |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Zero Trust → Tunnels → criar túnel novo para a VM |
 
