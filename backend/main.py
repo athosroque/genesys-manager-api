@@ -27,12 +27,13 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Accept"],
 )
-from routes import users, queues, groups, migration, auth_routes, audits, roles, divisions, analytics, diagnostics, system_diagnostics
+from routes import users, queues, groups, migration, auth_routes, audits, roles, divisions, analytics, diagnostics, system_diagnostics, telephony
 
 # Rotas de negócio
 app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(queues.router, prefix="/queues", tags=["Queues"])
+app.include_router(telephony.router, prefix="/telephony", tags=["Telephony"])
 app.include_router(groups.router, prefix="/groups", tags=["Groups"])
 app.include_router(roles.router, prefix="/roles", tags=["Roles"])
 app.include_router(divisions.router, prefix="/divisions", tags=["Divisions"])

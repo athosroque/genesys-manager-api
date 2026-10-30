@@ -19,6 +19,14 @@ export const getUserPresence = (userId, date) =>
 export const getUserTelephony = (userId) =>
     request(`/users/${encodeURIComponent(userId)}/telephony`)
 
+/** Busca ramais (telefones) pelo nome — usado quando o agente não tem ramal atribuído. */
+export const searchPhones = (name) =>
+    request(`/telephony/phones/search?name=${encodeURIComponent(name)}`)
+
+/** Exclui o ramal (telefone) da plataforma; a estação vinculada sai junto. */
+export const deletePhone = (phoneId) =>
+    request(`/telephony/phones/${encodeURIComponent(phoneId)}`, { method: 'DELETE' })
+
 
 export const reactivateUser = (userId, version) =>
     request(`/users/${userId}/reactivate`, {

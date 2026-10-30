@@ -42,6 +42,19 @@
         </button>
 
         <button
+          v-if="telephony"
+          type="button"
+          @click="openDeleteDialog"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors"
+          data-testid="open-delete-phone"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Excluir Ramal
+        </button>
+
+        <button
           type="button"
           :disabled="loading"
           @click="fetchTelephony"
@@ -190,13 +203,100 @@
         </div>
       </template>
     </div>
+
+    <!-- Exclusão de Ramal -->
+    <ConfirmDialog
+      v-if="showDeleteDialog"
+      title="Excluir Ramal"
+      type="danger"
+      confirm-label="Excluir"
+      :loading="deleteLoading"
+      @cancel="closeDeleteDialog"
+      @confirm="handleDeletePhone"
+    >
+      <div class="space-y-3" data-testid="delete-phone-dialog">
+        <!-- Ramal atribuído ao agente -->
+        <template v-if="deleteMode === 'assigned'">
+          <p>Ramal atribuído a <span class="font-semibold text-ink">{{ telephony?.user_name || 'este agente' }}</span>:</p>
+          <div class="rounded-xl border border-red-200 bg-red-50/60 p-3">
+            <p class="text-sm font-semibold text-ink">{{ telephony.phone.name }}</p>
+            <p v-if="telephony.phone.site" class="text-xs text-gray-500">Site: {{ telephony.phone.site.name }}</p>
+          </div>
+          <button
+            type="button"
+            class="text-xs font-medium text-brand hover:underline"
+            @click="deleteMode = 'search'"
+          >
+            Excluir outro ramal
+          </button>
+        </template>
+
+        <!-- Sem ramal atribuído: solicita o ramal -->
+        <template v-else>
+          <p v-if="!telephony?.phone" class="text-xs text-amber-700">
+            Este agente não possui ramal atribuído. Informe o ramal que deve ser excluído.
+          </p>
+          <form class="flex gap-2" @submit.prevent="runPhoneSearch">
+            <input
+              v-model="phoneQuery"
+              type="text"
+              placeholder="Nome do ramal (ex.: p523303)"
+              class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/30"
+              data-testid="phone-search-input"
+            />
+            <button
+              type="submit"
+              :disabled="phoneQuery.trim().length < 2 || searchLoading"
+              class="btn-secondary disabled:opacity-50"
+            >
+              {{ searchLoading ? 'Buscando…' : 'Buscar' }}
+            </button>
+          </form>
+
+          <p v-if="searchError" class="text-xs text-red-600">{{ searchError }}</p>
+          <p v-else-if="searched && !phoneResults.length" class="text-xs text-gray-500">Nenhum ramal encontrado.</p>
+
+          <ul v-if="phoneResults.length" class="max-h-56 overflow-y-auto space-y-1.5">
+            <li v-for="p in phoneResults" :key="p.id">
+              <label
+                class="flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer transition-colors"
+                :class="selectedPhone?.id === p.id ? 'border-red-300 bg-red-50/60' : 'border-gray-100 hover:bg-gray-50'"
+              >
+                <input v-model="selectedPhone" type="radio" :value="p" class="mt-1" />
+                <span class="min-w-0">
+                  <span class="block text-sm font-semibold text-ink truncate">{{ p.name }}</span>
+                  <span class="block text-xs text-gray-500">
+                    {{ p.web_rtc_user?.name ? `Atribuído a ${p.web_rtc_user.name}` : 'Sem usuário vinculado' }}
+                    <template v-if="p.site"> · {{ p.site.name }}</template>
+                  </span>
+                </span>
+              </label>
+            </li>
+          </ul>
+
+          <button
+            v-if="telephony?.phone"
+            type="button"
+            class="text-xs font-medium text-brand hover:underline"
+            @click="deleteMode = 'assigned'"
+          >
+            Voltar ao ramal atribuído
+          </button>
+        </template>
+
+        <p class="text-xs text-red-700 font-medium">
+          A exclusão é permanente e remove também a estação vinculada.
+        </p>
+      </div>
+    </ConfirmDialog>
   </div>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
 import LoadingSpinner from './LoadingSpinner.vue'
-import { getUserTelephony } from '../api/genesys'
+import ConfirmDialog from './ConfirmDialog.vue'
+import { getUserTelephony, searchPhones, deletePhone } from '../api/genesys'
 import { useToast } from '../composables/useToast'
 
 const props = defineProps({
@@ -238,6 +338,71 @@ watch(
   },
   { immediate: true },
 )
+
+// ── Exclusão de ramal ──
+// Com ramal atribuído, oferece excluí-lo direto; sem ramal (ou "Excluir outro
+// ramal"), solicita o nome e o operador escolhe entre os resultados da busca.
+const showDeleteDialog = ref(false)
+const deleteMode = ref('assigned') // 'assigned' | 'search'
+const deleteLoading = ref(false)
+const phoneQuery = ref('')
+const phoneResults = ref([])
+const selectedPhone = ref(null)
+const searchLoading = ref(false)
+const searchError = ref('')
+const searched = ref(false)
+
+function openDeleteDialog() {
+  deleteMode.value = telephony.value?.phone?.id ? 'assigned' : 'search'
+  phoneQuery.value = ''
+  phoneResults.value = []
+  selectedPhone.value = null
+  searchError.value = ''
+  searched.value = false
+  showDeleteDialog.value = true
+}
+
+function closeDeleteDialog() {
+  if (deleteLoading.value) return
+  showDeleteDialog.value = false
+}
+
+async function runPhoneSearch() {
+  const q = phoneQuery.value.trim()
+  if (q.length < 2) return
+  searchLoading.value = true
+  searchError.value = ''
+  selectedPhone.value = null
+  try {
+    const data = await searchPhones(q)
+    phoneResults.value = data.results || []
+  } catch (err) {
+    searchError.value = err.message || 'Erro ao buscar ramais'
+    phoneResults.value = []
+  } finally {
+    searched.value = true
+    searchLoading.value = false
+  }
+}
+
+async function handleDeletePhone() {
+  const target = deleteMode.value === 'assigned' ? telephony.value?.phone : selectedPhone.value
+  if (!target?.id) {
+    addToast('Selecione o ramal que deve ser excluído.', 'error')
+    return
+  }
+  deleteLoading.value = true
+  try {
+    await deletePhone(target.id)
+    addToast(`Ramal ${target.name || target.id} excluído com sucesso.`, 'success')
+    showDeleteDialog.value = false
+    await fetchTelephony()
+  } catch (err) {
+    addToast(err.message || 'Erro ao excluir ramal', 'error')
+  } finally {
+    deleteLoading.value = false
+  }
+}
 
 async function copyDiagnostic() {
   if (!telephony.value) return

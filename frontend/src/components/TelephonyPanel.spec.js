@@ -5,6 +5,8 @@ import * as genesysApi from '../api/genesys'
 
 vi.mock('../api/genesys', () => ({
   getUserTelephony: vi.fn(),
+  searchPhones: vi.fn(),
+  deletePhone: vi.fn(),
 }))
 
 describe('TelephonyPanel.vue', () => {
@@ -106,5 +108,72 @@ describe('TelephonyPanel.vue', () => {
     expect(wrapper.text()).toContain('Falha ao consultar telefonia')
     expect(wrapper.text()).toContain('Falha de rede 500')
     expect(wrapper.text()).toContain('Tentar novamente')
+  })
+
+  const baseNoPhone = {
+    user_id: 'u-9',
+    user_name: 'Agente Sem Ramal',
+    is_healthy: false,
+    diagnosis: '',
+    recommendations: [],
+    issues: [],
+    station: null,
+    phone: null,
+    summary: { station_assigned: false, station_associated: false, phone_active: false },
+  }
+
+  it('exclui o ramal atribuído ao agente', async () => {
+    const withPhone = {
+      ...baseNoPhone,
+      phone: { id: 'ph-1', name: 'p523303_SIP', state: 'active', site: { id: 's-1', name: 'Matriz' } },
+    }
+    genesysApi.getUserTelephony.mockResolvedValue(withPhone)
+    genesysApi.deletePhone.mockResolvedValueOnce({ success: true })
+
+    const wrapper = mount(TelephonyPanel, { props: { userId: 'u-9' } })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="open-delete-phone"]').trigger('click')
+    const dialog = wrapper.get('[data-testid="delete-phone-dialog"]')
+    expect(dialog.text()).toContain('p523303_SIP')
+    expect(wrapper.find('[data-testid="phone-search-input"]').exists()).toBe(false)
+
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text() === 'Excluir')
+    await confirmBtn.trigger('click')
+    await flushPromises()
+
+    expect(genesysApi.deletePhone).toHaveBeenCalledWith('ph-1')
+    expect(genesysApi.getUserTelephony).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[data-testid="delete-phone-dialog"]').exists()).toBe(false)
+  })
+
+  it('sem ramal atribuído, solicita o ramal e exclui o selecionado', async () => {
+    genesysApi.getUserTelephony.mockResolvedValue(baseNoPhone)
+    genesysApi.searchPhones.mockResolvedValueOnce({
+      results: [{ id: 'ph-7', name: 'p777_SIP', web_rtc_user: { id: 'u-x', name: 'Outro' }, site: null }],
+    })
+    genesysApi.deletePhone.mockResolvedValueOnce({ success: true })
+
+    const wrapper = mount(TelephonyPanel, { props: { userId: 'u-9' } })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="open-delete-phone"]').trigger('click')
+    expect(wrapper.text()).toContain('não possui ramal atribuído')
+
+    const confirmBtn = () => wrapper.findAll('button').find((b) => b.text() === 'Excluir')
+    await confirmBtn().trigger('click')
+    expect(genesysApi.deletePhone).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="phone-search-input"]').setValue('p777')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(genesysApi.searchPhones).toHaveBeenCalledWith('p777')
+    expect(wrapper.text()).toContain('Atribuído a Outro')
+
+    await wrapper.get('input[type="radio"]').setValue(true)
+    await confirmBtn().trigger('click')
+    await flushPromises()
+
+    expect(genesysApi.deletePhone).toHaveBeenCalledWith('ph-7')
   })
 })
