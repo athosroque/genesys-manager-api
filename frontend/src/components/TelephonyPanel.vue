@@ -31,19 +31,6 @@
         <button
           v-if="telephony"
           type="button"
-          @click="copyDiagnostic"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 hover:text-ink transition-colors"
-          title="Copiar resumo para atendimento"
-        >
-          <svg class="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-          </svg>
-          Copiar Laudo
-        </button>
-
-        <button
-          v-if="telephony"
-          type="button"
           @click="openDeleteDialog"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors"
           data-testid="open-delete-phone"
@@ -401,62 +388,6 @@ async function handleDeletePhone() {
     addToast(err.message || 'Erro ao excluir ramal', 'error')
   } finally {
     deleteLoading.value = false
-  }
-}
-
-async function copyDiagnostic() {
-  if (!telephony.value) return
-
-  const t = telephony.value
-  const statusLine = t.is_healthy
-    ? '🟢 CENÁRIO 1: Backend Íntegro (Problema Local na Máquina)'
-    : '🔴 CENÁRIO 2: Inconsistência no Genesys Cloud'
-
-  const stationName = t.station?.name || 'Nenhuma estação atribuída'
-  const stationStatus = t.station?.status || 'Desconectada'
-  const phoneName = t.phone?.name || 'Nenhum telefone'
-  const phoneSite = t.phone?.site?.name || 'Sem Site'
-
-  const lines = [
-    `[DIAGNÓSTICO DE TELEFONIA / RAMAL - GENESYS CLOUD]`,
-    `Usuário: ${t.user_name || '—'} (${t.user_id})`,
-    `Diagnóstico: ${statusLine}`,
-    `----------------------------------------------------`,
-    `1. Estação: ${stationName} (${t.station?.type || '—'})`,
-    `2. Conexão: ${stationStatus}`,
-    `3. Telefone Base: ${phoneName} | Estado: ${t.phone?.state || '—'} | Site: ${phoneSite}`,
-    `----------------------------------------------------`,
-    `Parecer Técnico:`,
-    `${t.diagnosis}`,
-  ]
-
-  if (t.issues && t.issues.length > 0) {
-    lines.push(`\nInconsistências Identificadas:`)
-    t.issues.forEach((issue) => lines.push(`- ${issue}`))
-  }
-
-  if (t.recommendations && t.recommendations.length > 0) {
-    lines.push(`\nRecomendações:`)
-    t.recommendations.forEach((rec, i) => lines.push(`${i + 1}. ${rec}`))
-  }
-
-  const fullText = lines.join('\n')
-
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(fullText)
-    } else {
-      const textarea = document.createElement('textarea')
-      textarea.value = fullText
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
-    }
-    addToast('Laudo de telefonia copiado para a área de transferência!', 'success')
-  } catch (err) {
-    console.error('Falha ao copiar:', err)
-    addToast('Não foi possível copiar automaticamente.', 'error')
   }
 }
 </script>
