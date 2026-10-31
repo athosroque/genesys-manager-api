@@ -275,7 +275,7 @@
         <!-- D) Migração (sempre visível após busca) -->
         <div class="card p-5">
           <p class="font-semibold text-ink mb-1">🚀 Executar Migração</p>
-          <p class="text-sm text-gray-500 mb-4">Atribuir divisão, role e/ou adicionar ao grupo de migração.</p>
+          <p class="text-sm text-gray-500 mb-4">Atribuir divisão, role e/ou adicionar ao grupo de migração. O Reset Autoconfiguração aplica Divisão Home + Role Employee e exclui o ramal atribuído, se houver.</p>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
@@ -308,14 +308,24 @@
             </div>
           </div>
 
-          <button
-            v-if="!showMigrationConfirm"
-            @click="showMigrationConfirm = true"
-            :disabled="(migrationOp === '2' || migrationOp === '3') && !migrationGroupId"
-            class="btn-primary"
-          >
-            🚀 Executar Migração
-          </button>
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              @click="showMigrationConfirm = true"
+              :disabled="(migrationOp === '2' || migrationOp === '3') && !migrationGroupId"
+              class="btn-primary"
+            >
+              🚀 Executar Migração
+            </button>
+
+            <button
+              @click="openResetConfirm"
+              :disabled="resetPrepLoading"
+              class="btn-primary disabled:opacity-50"
+              data-testid="open-reset-autoconfig"
+            >
+              {{ resetPrepLoading ? 'Verificando ramal...' : '♻️ Reset Autoconfiguração' }}
+            </button>
+          </div>
 
           <ConfirmDialog
             v-if="showMigrationConfirm"
@@ -357,22 +367,6 @@
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- E) Reset Autoconfiguração (Divisão Home + Role Employee + exclusão do ramal) -->
-        <div class="card p-5">
-          <p class="font-semibold text-ink mb-1">♻️ Reset Autoconfiguração</p>
-          <p class="text-sm text-gray-500 mb-4">Atribui Divisão Home + Role Employee e exclui o ramal atribuído ao usuário, se houver.</p>
-
-          <button
-            v-if="!showResetConfirm"
-            @click="openResetConfirm"
-            :disabled="resetPrepLoading"
-            class="btn-primary disabled:opacity-50"
-            data-testid="open-reset-autoconfig"
-          >
-            {{ resetPrepLoading ? 'Verificando ramal...' : '♻️ Reset Autoconfiguração' }}
-          </button>
 
           <ConfirmDialog
             v-if="showResetConfirm"
@@ -627,6 +621,7 @@ async function handleMigration() {
   try {
     const data = await runMigration(user.value.id, migrationOp.value, migrationGroupId.value || null)
     migrationSteps.value = data.steps || []
+    resetSteps.value = []
     showMigrationConfirm.value = false
     const ok = migrationSteps.value.filter(s => s.status === 'ok').length
     addToast(`Migração concluída: ${ok} passo(s) executado(s) com sucesso.`, 'success')
@@ -657,6 +652,7 @@ async function handleResetAutoconfig() {
   try {
     const data = await resetAutoconfig(user.value.id, resetPhone.value?.id || null)
     resetSteps.value = data.steps || []
+    migrationSteps.value = []
     showResetConfirm.value = false
     const failed = resetSteps.value.filter(s => s.status === 'error').length
     if (failed) {
