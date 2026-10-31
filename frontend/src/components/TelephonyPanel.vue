@@ -326,6 +326,9 @@ watch(
   { immediate: true },
 )
 
+// Permite à Consulta recarregar o painel após ações que mexem no ramal.
+defineExpose({ refresh: fetchTelephony })
+
 // ── Exclusão de ramal ──
 // Com ramal atribuído, oferece excluí-lo direto; sem ramal (ou "Excluir outro
 // ramal"), solicita o nome e o operador escolhe entre os resultados da busca.

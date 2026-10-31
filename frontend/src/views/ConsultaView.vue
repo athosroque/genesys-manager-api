@@ -155,7 +155,7 @@
           </div>
 
           <!-- Diagnóstico de Telefonia e Ramal -->
-          <TelephonyPanel :user-id="user.id" />
+          <TelephonyPanel ref="telephonyPanel" :user-id="user.id" />
 
           <PresencePanel :user-id="user.id" />
         </div>
@@ -359,6 +359,70 @@
           </div>
         </div>
 
+        <!-- E) Reset Autoconfiguração (Divisão Home + Role Employee + exclusão do ramal) -->
+        <div class="card p-5">
+          <p class="font-semibold text-ink mb-1">♻️ Reset Autoconfiguração</p>
+          <p class="text-sm text-gray-500 mb-4">Atribui Divisão Home + Role Employee e exclui o ramal atribuído ao usuário, se houver.</p>
+
+          <button
+            v-if="!showResetConfirm"
+            @click="openResetConfirm"
+            :disabled="resetPrepLoading"
+            class="btn-primary disabled:opacity-50"
+            data-testid="open-reset-autoconfig"
+          >
+            {{ resetPrepLoading ? 'Verificando ramal...' : '♻️ Reset Autoconfiguração' }}
+          </button>
+
+          <ConfirmDialog
+            v-if="showResetConfirm"
+            title="Confirmar Reset Autoconfiguração"
+            type="warning"
+            confirm-label="Executar Reset"
+            :loading="actionLoading"
+            @cancel="showResetConfirm = false"
+            @confirm="handleResetAutoconfig"
+          >
+            <div class="text-sm text-gray-600 space-y-3" data-testid="reset-autoconfig-dialog">
+              <div class="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-1.5 text-xs font-mono">
+                <p><span class="text-gray-400">Usuário:</span> {{ user.name }}</p>
+                <p><span class="text-gray-400">E-mail:</span> {{ user.email }}</p>
+                <p><span class="text-gray-400">UUID:</span> {{ user.id }}</p>
+                <p><span class="text-gray-400">Operação:</span> Divisão Home + Role Employee</p>
+              </div>
+              <div v-if="resetPhone" class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                <p class="font-semibold">O ramal abaixo será excluído:</p>
+                <p class="font-mono mt-1">{{ resetPhone.name || resetPhone.id }}</p>
+                <p v-if="resetPhone.site" class="mt-0.5">Site: {{ resetPhone.site.name }}</p>
+              </div>
+              <div v-else class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                Este usuário não possui ramal atribuído. Nenhum ramal será excluído; será atribuída somente a divisão e a role.
+              </div>
+              <p class="text-xs text-gray-400">Nenhuma outra configuração do usuário será alterada.</p>
+            </div>
+          </ConfirmDialog>
+
+          <div v-if="resetSteps.length > 0" class="mt-4 space-y-1.5">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Resultado do Reset:</p>
+            <div
+              v-for="(step, i) in resetSteps"
+              :key="i"
+              class="flex items-start gap-2 text-sm px-3 py-2 rounded-xl"
+              :class="{
+                'bg-green-50 text-green-800 border border-green-200': step.status === 'ok',
+                'bg-amber-50 text-amber-800 border border-amber-200': step.status === 'skip',
+                'bg-red-50 text-red-700 border border-red-200': step.status === 'error',
+              }"
+            >
+              <span class="shrink-0 mt-0.5">{{ step.status === 'ok' ? '✅' : step.status === 'skip' ? '⚠️' : '❌' }}</span>
+              <div>
+                <p class="font-medium leading-tight">{{ step.label }}</p>
+                <p class="text-xs opacity-70 mt-0.5">{{ step.detail }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </template>
   </div>
@@ -381,6 +445,8 @@ import {
   removeFromQueue,
   removeFromGroup,
   runMigration,
+  resetAutoconfig,
+  getUserTelephony,
   getGroupsConfig
 } from '../api/genesys'
 
@@ -407,6 +473,13 @@ const queueToRemove          = ref(null)  // fila selecionada para remoção ind
 const groupToRemove          = ref(null)  // grupo selecionado para remoção individual (tabela)
 const showQueuesConfirm      = ref(false) // mantido para lógica interna se necessário
 const queuesExpanded         = ref(true)
+const telephonyPanel         = ref(null)
+
+// ─── Reset autoconfiguração ───────────────────────────────────────────────
+const showResetConfirm = ref(false)
+const resetPrepLoading = ref(false)
+const resetPhone       = ref(null)  // ramal que será excluído (null = nenhum)
+const resetSteps       = ref([])
 
 // ─── Grupos e migração ────────────────────────────────────────────────────
 const migrationOp      = ref('1')
@@ -448,6 +521,7 @@ async function handleSearch(q, { soft = false } = {}) {
     user.value = null
     queues.value = []
     migrationSteps.value = []
+    resetSteps.value = []
   }
   searchLoading.value = true
 
@@ -559,6 +633,41 @@ async function handleMigration() {
     await refetch()
   } catch (err) {
     addToast('Erro na migração: ' + err.message, 'error')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+// Busca o ramal na hora do clique para que a confirmação mostre o estado atual.
+async function openResetConfirm() {
+  resetPrepLoading.value = true
+  try {
+    const telephony = await getUserTelephony(user.value.id)
+    resetPhone.value = telephony?.phone?.id ? telephony.phone : null
+    showResetConfirm.value = true
+  } catch (err) {
+    addToast('Erro ao verificar o ramal do usuário: ' + err.message, 'error')
+  } finally {
+    resetPrepLoading.value = false
+  }
+}
+
+async function handleResetAutoconfig() {
+  actionLoading.value = true
+  try {
+    const data = await resetAutoconfig(user.value.id, resetPhone.value?.id || null)
+    resetSteps.value = data.steps || []
+    showResetConfirm.value = false
+    const failed = resetSteps.value.filter(s => s.status === 'error').length
+    if (failed) {
+      addToast(`Reset concluído com ${failed} falha(s). Veja o resultado.`, 'error')
+    } else {
+      addToast('Reset da autoconfiguração concluído.', 'success')
+    }
+    telephonyPanel.value?.refresh()
+    await refetch()
+  } catch (err) {
+    addToast('Erro no reset: ' + err.message, 'error')
   } finally {
     actionLoading.value = false
   }

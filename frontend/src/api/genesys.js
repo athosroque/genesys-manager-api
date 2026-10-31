@@ -50,6 +50,16 @@ export const runMigration = (userId, op, groupId = null) =>
         body: JSON.stringify({ user_id: userId, op, group_id: groupId })
     })
 
+/**
+ * Reset da autoconfiguração: Divisão Home + Role Employee e exclusão do ramal
+ * confirmado (phoneId null = nenhum ramal a excluir).
+ */
+export const resetAutoconfig = (userId, phoneId = null) =>
+    request('/migration/reset-autoconfig', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, phone_id: phoneId })
+    })
+
 export const getGroupsConfig = () => request('/config/groups')
 
 // Lookup leve de nome de usuário por UUID (sem expand) — fonte do cache de
